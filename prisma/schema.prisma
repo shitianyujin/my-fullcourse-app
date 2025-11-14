@@ -1,0 +1,256 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ====================================================================
+// I. 基盤
+// ====================================================================
+
+// 1. ユーザー (users)
+model User {
+  id                Int      @id @default(autoincrement())
+  name              String   @db.VarChar(100)
+  email             String   @unique @db.VarChar(100) // 認証用のユニークメールアドレス
+  hashedPassword    String?  @db.VarChar(255) // パスワードハッシュを格納するカラム(Auth.js関連)
+  image             String?  @db.VarChar(255)
+  bio               String?  @db.Text
+  isAdmin           Boolean  @default(false)
+  courseCount       Int      @default(0) // 投稿数カウンタ
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lastLoggedInAt    DateTime?
+  // Auth.js連携用
+  emailVerified     DateTime?
+
+  // リレーション
+  courses           Course[]
+  wantsToEatRecords WantsToEat[]
+  comments          Comment[]
+  triedRecords      Tried[]
+  ratings           Rating[]
+  // Auth.js連携用
+  accounts          Account[]
+  sessions          Session[]
+
+  @@map("users")
+}
+
+// ====================================================================
+// II. カタログ/マスター
+// ====================================================================
+
+// 2. 冷凍食品カタログ (products)
+model Product {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.VarChar(100)
+  manufacturer    String   @db.VarChar(50)
+  description     String?  @db.Text
+  janCode         String?  @unique @db.VarChar(13)
+  imageUrl        String?  @db.VarChar(255)
+  officialUrl     String?  @db.VarChar(255)
+  priceReference  String?  @db.VarChar(20)
+  priceUnitQty    String?  @db.VarChar(50)
+  isOnSale        Boolean  @default(true)
+  amazonAsin      String?  @db.VarChar(10) // マネタイズ機能の準備
+  lastCheckedAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // リレーション
+  courseItems     CourseItem[]
+  productCategories ProductCategory[]
+
+  @@map("products")
+}
+
+// 3. カテゴリマスター (categories)
+model Category {
+  id              Int      @id @default(autoincrement())
+  name            String   @unique @db.VarChar(50)
+  description     String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // リレーション
+  productCategories ProductCategory[]
+
+  @@map("categories")
+}
+
+// 4. 商品カテゴリ中間 (product_categories) - 多対多の中間テーブル
+model ProductCategory {
+  productId   Int
+  categoryId  Int
+
+  // リレーション
+  product     Product  @relation(fields: [productId], references: [id])
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  @@id([productId, categoryId]) // 複合主キー
+  @@map("product_categories")
+}
+
+// ====================================================================
+// III. コア/トランザクション
+// ====================================================================
+
+// 5. フルコース投稿 (courses)
+model Course {
+  id            Int      @id @default(autoincrement())
+  title         String   @db.VarChar(100)
+  description   String?  @db.Text
+  userId        Int
+  wantsToEatCount Int    @default(0) // 食べたい数
+  triedCount      Int    @default(0)   // 食べたよ数
+  averageRating Decimal? @db.Decimal(3, 2) // 平均評価点 (例: 4.50)
+  commentCount  Int    @default(0) // コメント数
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // リレーション
+  user          User       @relation(fields: [userId], references: [id])
+  courseItems   CourseItem[]
+  wantsToEat    WantsToEat[]
+  comments      Comment[]
+  trieds        Tried[]
+  ratings       Rating[]
+
+  @@map("courses")
+}
+
+// 6. コース構成要素 (course_items)
+model CourseItem {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  productId Int
+  order     Int      // フルコース内での順番 (1:アミューズ, 6:デセールなど)
+  role      String?  @db.VarChar(50) // 役割 (アミューズ、メインなど)
+
+  // リレーション
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade) // コース削除時、構成要素も削除
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@map("course_items")
+}
+
+// ====================================================================
+// IV. コミュニティ
+// ====================================================================
+
+// 7. 評価 (ratings) - ユーザーごとの点数
+model Rating {
+  id          Int      @id @default(autoincrement())
+  courseId    Int
+  userId      Int
+  score       Int      @db.TinyInt // 1から5点などのスコア
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // リレーション
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([courseId, userId]) // 1ユーザーが1コースに複数回評価できないようにする
+  @@map("ratings")
+}
+
+// 8. 食べたい履歴 (wants_to_eat)
+model WantsToEat {
+  id          Int      @id @default(autoincrement())
+  courseId    Int
+  userId      Int
+  createdAt   DateTime @default(now())
+
+  // リレーション
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([courseId, userId]) // 1ユーザーが1コースに複数回「食べたい」を付けられないようにする
+  @@map("wants_to_eat")
+}
+
+// 9. コメント (comments)
+model Comment {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  userId    Int
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // リレーション
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("comments")
+}
+
+// 10. 食べたよ履歴 (trieds)
+model Tried {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  userId    Int
+  createdAt DateTime @default(now())
+
+  // リレーション
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([courseId, userId]) // 1ユーザーが1コースに複数回「食べたよ」を付けられないようにする
+  @@map("trieds")
+}
+
+// ====================================================================
+// V. NextAuth.js (Auth.js) 用の追加モデル
+// ====================================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            Int
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       Int
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtokens")
+}
