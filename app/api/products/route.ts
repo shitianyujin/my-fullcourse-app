@@ -1,33 +1,100 @@
+// app/api/products/route.ts (修正後)
+
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// 1ページあたりのデフォルトの製品数
+const DEFAULT_LIMIT = 20; 
+
 /**
  * GET /api/products
- * 食品カタログの全リストを返すAPIエンドポイント。
+ * 製品の検索とリスト取得（ページネーション対応、メーカー絞り込み対応）
+ * * クエリパラメータ:
+ * - search: 検索キーワード (optional)
+ * - manufacturer: メーカー名による絞り込み (optional) // 💡 メーカー検索を追加
+ * - page: 取得するページ番号 (default: 1)
+ * - limit: 1ページあたりの件数 (default: 20)
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // DBからすべての食品 (Product) を取得
+    const { searchParams } = new URL(request.url);
+    
+    // クエリパラメータの取得と型変換
+    const search = searchParams.get('search') || undefined;
+    // 💡 manufacturer パラメータを取得
+    const manufacturerFilter = searchParams.get('manufacturer') || undefined; 
+    
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || DEFAULT_LIMIT.toString(), 10);
+    
+    const skip = (page - 1) * limit;
+
+    // WHERE句の構築
+    let whereCondition: any = {};
+    
+    // 検索キーワードによるOR条件
+    if (search) {
+      whereCondition.OR = [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive' as const, // 大文字小文字を区別しない
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive' as const,
+          },
+        },
+      ];
+    }
+    
+    // 💡 メーカー絞り込み条件を追加
+    if (manufacturerFilter) {
+        whereCondition.manufacturer = manufacturerFilter;
+    }
+
+    // ----------------------------------------------------
+    // データベース検索
+    // ----------------------------------------------------
+    
+    // 1. 製品リストの取得
     const products = await prisma.product.findMany({
-      // ユーザーに見せるために必要なフィールドのみ選択
+      where: whereCondition,
       select: {
         id: true,
         name: true,
         description: true,
-        manufacturer: true,
         priceReference: true,
+        imageUrl: true, 
+        manufacturer: true, // 💡 メーカー情報の取得を追加！
       },
-      // 名前でソート
-      orderBy: {
-        name: 'asc',
-      }
+      take: limit,
+      skip: skip,
+      orderBy: { 
+        name: 'asc' // 名前順でソート
+      },
     });
 
-    return NextResponse.json(products, { status: 200 });
+    // 2. 全件数のカウント
+    const totalCount = await prisma.product.count({
+      where: whereCondition,
+    });
+    
+    // 3. レスポンスの返却
+    return NextResponse.json({
+      products: products,
+      total: totalCount,
+      page: page,
+      limit: limit,
+      totalPages: Math.ceil(totalCount / limit),
+    });
+
   } catch (error) {
-    console.error('Failed to fetch products:', error);
+    console.error("製品検索中にエラーが発生しました:", error);
     return NextResponse.json(
-      { message: 'Internal Server Error' }, 
+      { message: "製品の取得中にサーバーエラーが発生しました。" },
       { status: 500 }
     );
   }
