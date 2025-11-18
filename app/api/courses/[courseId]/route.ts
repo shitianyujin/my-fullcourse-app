@@ -1,72 +1,90 @@
-// app/api/courses/[courseId]/route.ts
+// app/api/courses/[courseId]/route.ts (GET関数全体)
 
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
+import { authOptions } from "@/lib/auth";
+
+// ... (POST関数は省略) ...
 
 /**
  * GET /api/courses/[courseId]
- * 特定のフルコースの詳細情報と構成アイテムを取得するAPI
+ * 特定のフルコースの詳細を取得するAPI
  */
 export async function GET(
     request: Request,
     { params }: { params: { courseId: string } }
 ) {
-    const courseId = params.courseId;
+    const courseId = parseInt(params.courseId, 10);
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.email 
+        ? (await prisma.user.findUnique({ 
+            where: { email: session.user.email }, 
+            select: { id: true } 
+        }))?.id 
+        : null;
 
-    if (!courseId) {
-        return NextResponse.json(
-            { message: "コースIDは必須です。" },
-            { status: 400 } // Bad Request
-        );
-    }
-
-    // IDが数値であることを確認
-    const id = parseInt(courseId, 10);
-    if (isNaN(id)) {
-        return NextResponse.json(
-            { message: "無効なコースIDです。" },
-            { status: 400 }
-        );
+    if (isNaN(courseId)) {
+        return NextResponse.json({ message: "無効なIDです。" }, { status: 400 });
     }
 
     try {
         const course = await prisma.course.findUnique({
-            where: { id: id },
-            // 💡 関連データを結合して取得
+            where: { id: courseId },
             include: {
-                user: { // 作成者
-                    select: { id: true, name: true, email: true },
+                user: {
+                    select: { id: true, name: true, image: true },
                 },
                 courseItems: {
-                    orderBy: { order: 'asc' }, // 順番通りに
+                    orderBy: { order: 'asc' },
                     include: {
-                        product: { // 製品情報
-                            select: { 
-                                id: true, 
-                                name: true, 
-                                imageUrl: true, 
-                                priceReference: true,
-                                manufacturer: true, // 💡 メーカー情報も取得
-                            },
-                        },
+                        product: true,
                     },
                 },
             },
         });
 
         if (!course) {
-            return NextResponse.json(
-                { message: "指定されたフルコースは見つかりませんでした。" },
-                { status: 404 } // Not Found
-            );
+            return NextResponse.json({ message: "コースが見つかりません。" }, { status: 404 });
         }
 
-        return NextResponse.json(course);
+        // ログインユーザーが既に「食べたい」しているかチェック
+        let isWantsToEat = false;
+        let isTried = false; // 💡 追加
+
+        if (userId) {
+            const wantsToEatRecord = await prisma.wantsToEat.findUnique({
+                where: {
+                    courseId_userId: { 
+                        courseId: courseId,
+                        userId: userId,
+                    },
+                },
+            });
+            isWantsToEat = !!wantsToEatRecord;
+
+            // 💡 ログインユーザーが既に「食べた」しているかチェック
+            const triedRecord = await prisma.tried.findUnique({
+                where: {
+                    courseId_userId: { 
+                        courseId: courseId,
+                        userId: userId,
+                    },
+                },
+            });
+            isTried = !!triedRecord;
+        }
+
+        return NextResponse.json({
+            ...course,
+            isWantsToEat: isWantsToEat,
+            isTried: isTried, // 💡 状態を追加
+        });
 
     } catch (error) {
-        console.error("コース取得中にエラーが発生しました:", error);
+        console.error("コース詳細取得エラー:", error);
         return NextResponse.json(
-            { message: "サーバーエラーによりコースの取得に失敗しました。" },
+            { message: "コース詳細の取得に失敗しました。" },
             { status: 500 }
         );
     }

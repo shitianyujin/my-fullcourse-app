@@ -1,7 +1,8 @@
-const config = {
-  plugins: {
-    "@tailwindcss/postcss": {},
-  },
-};
+// postcss.config.js (ESM 形式)
 
-export default config;
+export default { // 💡 export default に戻す
+  plugins: {
+    'tailwindcss': {},
+    'autoprefixer': {},
+  },
+}
