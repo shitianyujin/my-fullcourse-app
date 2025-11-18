@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Providers } from "./providers"; 
+import { Providers } from "./providers";
+import { Navbar } from '@/components/Navbar'; 
 
 export const metadata: Metadata = {
   title: "My Fullcourse App",
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="ja">
       <body>
         <Providers>
+        <Navbar />
           {children}
         </Providers>
       </body>
