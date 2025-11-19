@@ -3,19 +3,24 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
 import { 
-  FaUserCircle, 
-  FaTag, 
-  FaStar, 
-  FaRegCommentDots
+    FaUserCircle, 
+    FaTag, 
+    FaStar, 
+    FaRegCommentDots
 } from 'react-icons/fa';
-import InteractiveBadge from '@/components/InteractiveBadge'; 
+import InteractiveBadge from '@/components/InteractiveBadge';
+import RatingButton from '@/components/RatingButton'; 
+import CommentSection from '@/components/CommentSection'; 
+import CommentBadge from '@/components/CommentBadge'; // 💡 CommentBadgeをインポート
+import { formatAverageRating } from '@/lib/utils'; // 💡 パスはご自身の環境に合わせてください
+
 
 // サーバーサイドでのデータ取得関数 (変更なし)
 async function getCourse(courseId: string) {
+// ... (getCourse関数は変更なし) ...
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     
     try {
-        // キャッシュを無効化
         const res = await fetch(`${baseUrl}/api/courses/${courseId}`, {
             cache: 'no-store',
         });
@@ -40,11 +45,7 @@ export default async function CourseDetailPage({
     if (!course) {
         notFound();
     }
-
-    const formattedRating = course.averageRating 
-        ? Number(course.averageRating).toFixed(1) 
-        : '-';
-
+    
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-8">
             {/* ヘッダー部分 */}
@@ -57,35 +58,32 @@ export default async function CourseDetailPage({
                 {/* 💡修正: スタッツ（評価・カウンター）エリア */}
                 <div className="flex flex-wrap gap-3 mb-6">
                     
-                    {/* 食べたいバッジ (InteractiveBadgeへ変更) */}
+                    {/* 食べたいバッジ (InteractiveBadge) */}
                     <InteractiveBadge 
                         courseId={course.id} 
                         initialCount={course.wantsToEatCount}
                         initialIsActive={course.isWantsToEat}
-                        type="wantsToEat" // 💡 typeを指定
+                        type="wantsToEat"
                     />
 
-                    {/* 食べたよ数 (InteractiveBadgeへ変更) */}
+                    {/* 食べたよ数 (InteractiveBadge) */}
                     <InteractiveBadge 
                         courseId={course.id} 
                         initialCount={course.triedCount}
-                        initialIsActive={course.isTried} // 💡 isTriedを渡す
-                        type="tried" // 💡 typeを指定
+                        initialIsActive={course.isTried}
+                        type="tried"
                     />
 
-                    {/* 平均評価 (静的なまま) */}
-                    <div className="flex items-center px-3 py-1.5 bg-yellow-50 text-yellow-600 rounded-full border border-yellow-100 shadow-sm">
-                        <FaStar className="mr-2" />
-                        <span className="text-sm font-bold">{formattedRating}</span>
-                        <span className="text-xs ml-1">評価</span>
-                    </div>
+                    {/* 評価ボタン (RatingButton) */}
+                    <RatingButton
+                        courseId={course.id}
+                        initialAverageRating={course.averageRating}
+                        initialTotalRatingsCount={course.totalRatingsCount}
+                        initialUserRatingScore={course.userRatingScore}
+                    />
 
-                    {/* コメント数 (静的なまま) */}
-                    <div className="flex items-center px-3 py-1.5 bg-gray-50 text-gray-600 rounded-full border border-gray-200 shadow-sm">
-                        <FaRegCommentDots className="mr-2" />
-                        <span className="text-sm font-bold">{course.commentCount}</span>
-                        <span className="text-xs ml-1">コメント</span>
-                    </div>
+                    {/* 💡 CommentBadgeを配置 */}
+                    <CommentBadge courseId={course.id} />
                 </div>
 
                 {/* 説明文 */}
@@ -106,13 +104,12 @@ export default async function CourseDetailPage({
                 </div>
             </div>
 
-            {/* コースアイテムリスト (省略) */}
+            {/* コースアイテムリスト */}
             <h2 className="text-2xl font-bold text-gray-800 mb-5">
                 コース構成
             </h2>
             
-            {/* ... (コースアイテムのリスト部分は変更なし) ... */}
-             <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-300 before:to-transparent">
+              <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-300 before:to-transparent">
                 {course.courseItems.map((item: any, index: number) => (
                     <div key={item.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                         
@@ -162,6 +159,13 @@ export default async function CourseDetailPage({
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* 💡 コメントセクションの組み込み */}
+            <div className="mt-12 pt-8 border-t border-gray-200" id="comments">
+                <CommentSection
+                    courseId={course.id}
+                />
             </div>
         </div>
     );

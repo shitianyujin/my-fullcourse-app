@@ -1,11 +1,9 @@
-// app/api/courses/[courseId]/route.ts (GET関数全体)
+// app/api/courses/[courseId]/route.ts (完全なGET関数とPOST関数)
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
-
-// ... (POST関数は省略) ...
 
 /**
  * GET /api/courses/[courseId]
@@ -41,6 +39,9 @@ export async function GET(
                         product: true,
                     },
                 },
+                ratings: {
+                    select: { score: true }
+                }
             },
         });
 
@@ -48,37 +49,56 @@ export async function GET(
             return NextResponse.json({ message: "コースが見つかりません。" }, { status: 404 });
         }
 
-        // ログインユーザーが既に「食べたい」しているかチェック
+        // ----------------------------------------------------
+        // ユーザー固有の状態チェック
+        // ----------------------------------------------------
         let isWantsToEat = false;
-        let isTried = false; // 💡 追加
+        let isTried = false;
+        let userRatingScore: number | null = null; 
 
         if (userId) {
+            // 食べたいチェック
             const wantsToEatRecord = await prisma.wantsToEat.findUnique({
-                where: {
-                    courseId_userId: { 
-                        courseId: courseId,
-                        userId: userId,
-                    },
-                },
+                where: { courseId_userId: { courseId: courseId, userId: userId } },
             });
             isWantsToEat = !!wantsToEatRecord;
 
-            // 💡 ログインユーザーが既に「食べた」しているかチェック
+            // 食べたチェック
             const triedRecord = await prisma.tried.findUnique({
-                where: {
-                    courseId_userId: { 
-                        courseId: courseId,
-                        userId: userId,
-                    },
-                },
+                where: { courseId_userId: { courseId: courseId, userId: userId } },
             });
             isTried = !!triedRecord;
+            
+            // ユーザーの評価チェック
+            const userRatingRecord = await prisma.rating.findUnique({
+                where: { courseId_userId: { courseId: courseId, userId: userId } },
+                select: { score: true }
+            });
+            userRatingScore = userRatingRecord ? userRatingRecord.score : null;
         }
 
+        // ----------------------------------------------------
+        // 平均評価の計算
+        // ----------------------------------------------------
+        let averageRating: number | null = null;
+        const totalRatings = course.ratings.length;
+
+        if (totalRatings > 0) {
+            const sum = course.ratings.reduce((acc, rating) => acc + rating.score, 0);
+            averageRating = sum / totalRatings;
+        }
+
+        // ----------------------------------------------------
+        // 返却データ
+        // ----------------------------------------------------
         return NextResponse.json({
             ...course,
+            averageRating: averageRating,
             isWantsToEat: isWantsToEat,
-            isTried: isTried, // 💡 状態を追加
+            isTried: isTried,
+            userRatingScore: userRatingScore,
+            totalRatingsCount: totalRatings,
+            ratings: undefined, 
         });
 
     } catch (error) {
