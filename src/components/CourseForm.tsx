@@ -1,27 +1,37 @@
-// src/components/CourseForm.tsx (メーカー対応と役割制御の修正 - 最終版)
+// src/components/CourseForm.tsx (編集対応版)
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { ProductSelectionModal } from './ProductSelectionModal';
 
-// 💡 必須: メーカー情報を追加
 interface CourseItem {
   key: string; 
   role: string; 
   productId: number | null; 
   productName: string | null; 
   productImageUrl: string | null; 
-  manufacturer: string | null; // <-- 必須
+  manufacturer: string | null;
   isMandatory: boolean; 
 }
 
-// 役割の選択肢とデフォルト値
+// 編集用のデータ型
+interface InitialData {
+  title: string;
+  description: string;
+  courseItems: any[];
+}
+
+interface CourseFormProps {
+  courseId?: number;         // 編集時のみ渡される
+  initialData?: InitialData; // 編集時のみ渡される
+}
+
 const roleOptions = ['前菜', 'つまみ', 'メインディッシュ', 'デザート', 'ドリンク', 'その他', '未選択'];
 const DEFAULT_ROLE = '未選択';
 
-// 💡 必須のコース構成にメーカー情報を追加
+// デフォルトの必須構造（新規作成用）
 const INITIAL_MANDATORY_STRUCTURE: CourseItem[] = [
   { key: 'm-0', role: '前菜', productId: null, productName: null, productImageUrl: null, manufacturer: null, isMandatory: true },
   { key: 'm-1', role: 'つまみ', productId: null, productName: null, productImageUrl: null, manufacturer: null, isMandatory: true },
@@ -30,13 +40,10 @@ const INITIAL_MANDATORY_STRUCTURE: CourseItem[] = [
   { key: 'm-4', role: 'デザート', productId: null, productName: null, productImageUrl: null, manufacturer: null, isMandatory: true },
 ];
 
-
-/**
- * フルコース投稿フォームコンポーネント
- */
-export const CourseForm: React.FC = () => {
-  const { status } = useSession();
+export const CourseForm: React.FC<CourseFormProps> = ({ courseId, initialData }) => {
+  const { data: session, status } = useSession(); 
   const router = useRouter();
+  const isEditMode = !!courseId; // 編集モードかどうか
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -50,28 +57,76 @@ export const CourseForm: React.FC = () => {
   const [modalInitialRole, setModalInitialRole] = useState('その他'); 
 
   // --------------------------------------------------
-  // 処理: モーダル連携 (選択・変更)
+  // 初期データのロード処理 (編集モード用)
   // --------------------------------------------------
+  useEffect(() => {
+    if (initialData) {
+      setTitle(initialData.title);
+      setDescription(initialData.description || '');
 
-  // モーダルを開く処理
+      // DBのアイテムをUI用のCourseItem形式に変換
+      if (initialData.courseItems && initialData.courseItems.length > 0) {
+        // order順にソート
+        const sortedItems = [...initialData.courseItems].sort((a, b) => a.order - b.order);
+        
+        const loadedItems: CourseItem[] = [];
+
+        // 最初の5つは必須枠に割り当て
+        for (let i = 0; i < 5; i++) {
+          const dbItem = sortedItems[i]; // 存在するかもしれないし、ないかもしれない
+          if (dbItem) {
+            loadedItems.push({
+              key: `m-${i}`,
+              role: dbItem.role || INITIAL_MANDATORY_STRUCTURE[i].role,
+              productId: dbItem.productId,
+              productName: dbItem.product?.name || null,
+              productImageUrl: dbItem.product?.imageUrl || null,
+              manufacturer: dbItem.product?.manufacturer || null,
+              isMandatory: true,
+            });
+          } else {
+            // DBにデータが足りない場合はデフォルト構造を使う
+            loadedItems.push(INITIAL_MANDATORY_STRUCTURE[i]);
+          }
+        }
+
+        // 6つ目以降は任意枠として追加
+        for (let i = 5; i < sortedItems.length; i++) {
+          const dbItem = sortedItems[i];
+          loadedItems.push({
+            key: `optional-${i}`,
+            role: dbItem.role || 'その他',
+            productId: dbItem.productId,
+            productName: dbItem.product?.name || null,
+            productImageUrl: dbItem.product?.imageUrl || null,
+            manufacturer: dbItem.product?.manufacturer || null,
+            isMandatory: false,
+          });
+        }
+
+        setCourseItems(loadedItems);
+      }
+    }
+  }, [initialData]);
+
+  // ... (以下、既存のハンドラーはほぼ同じ) ...
+
   const handleOpenModal = (itemKey: string, initialRole: string) => {
     setEditingItemKey(itemKey);
     setModalInitialRole(initialRole); 
     setIsModalOpen(true);
   };
   
-  // 💡 モーダルから製品が選択されたときの処理（メーカー情報を受け取る）
   const handleProductSelected = useCallback((
     productId: number, 
     productName: string, 
     productImageUrl: string,
     selectedRole: string,
-    manufacturer: string // <-- 受け取り
+    manufacturer: string 
   ) => {
-    const selectedProduct = { productId, productName, productImageUrl, manufacturer }; // <-- メーカー情報を含む
+    const selectedProduct = { productId, productName, productImageUrl, manufacturer };
 
     if (editingItemKey === 'NEW_ITEM' || editingItemKey === null) {
-        // 新規アイテムとして追加 (CourseForm.tsx内ではこのロジックが使用される)
         const newKey = `optional-${Date.now()}`;
         const newItem: CourseItem = { 
             key: newKey, 
@@ -81,7 +136,6 @@ export const CourseForm: React.FC = () => {
         };
         setCourseItems(prev => [...prev, newItem]);
     } else {
-        // 既存アイテムの更新
         setCourseItems(prevItems => prevItems.map(item => 
             item.key === editingItemKey 
                 ? { ...item, ...selectedProduct, role: selectedRole } 
@@ -93,7 +147,6 @@ export const CourseForm: React.FC = () => {
     setIsModalOpen(false); 
   }, [editingItemKey]);
 
-  // 製品の削除（未選択状態に戻す）またはアイテムの削除 
   const handleRemoveItem = useCallback((itemKey: string) => {
     const itemToRemove = courseItems.find(item => item.key === itemKey);
     if (!itemToRemove) return;
@@ -101,7 +154,6 @@ export const CourseForm: React.FC = () => {
     if (itemToRemove.isMandatory) {
       setCourseItems(prevItems => prevItems.map(item => 
         item.key === itemKey 
-          // 製品情報とメーカー情報をリセット
           ? { ...item, productId: null, productName: null, productImageUrl: null, manufacturer: null } 
           : item
       ));
@@ -118,13 +170,10 @@ export const CourseForm: React.FC = () => {
     ));
   }, []);
 
-  // 商品追加ボタンを押した際の処理
   const handleAddOptionalItem = () => {
-      // 💡 モーダルを新規追加モードで開き、役割の初期値として'その他'を渡す
       handleOpenModal('NEW_ITEM', 'その他'); 
   };
   
-  // 全アイテムの順序変更 (上下ボタン)
   const handleMoveItem = useCallback((index: number, direction: 'up' | 'down') => {
     const newItems = [...courseItems];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
@@ -136,7 +185,7 @@ export const CourseForm: React.FC = () => {
   }, [courseItems]);
 
   // --------------------------------------------------
-  // 処理: フォームの送信
+  // 送信処理 (新規/更新 分岐)
   // --------------------------------------------------
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,7 +195,6 @@ export const CourseForm: React.FC = () => {
       return;
     }
     
-    // 必須チェックの強化
     const missingMandatory = courseItems
       .filter(item => item.isMandatory)
       .some(item => item.productId === null || item.role === DEFAULT_ROLE); 
@@ -172,18 +220,24 @@ export const CourseForm: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetch('/api/courses', {
-        method: 'POST',
+      // 編集モードなら PUT, 新規なら POST
+      const url = isEditMode ? `/api/courses/${courseId}` : '/api/courses';
+      const method = isEditMode ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(apiData),
       });
 
       if (response.ok) {
-        alert('フルコースの投稿が完了しました！');
-        router.push('/');
+        alert(isEditMode ? 'フルコースを更新しました！' : 'フルコースの投稿が完了しました！');
+        // 編集完了後は詳細画面へ、新規作成後はトップへ
+        router.push(isEditMode ? `/course/${courseId}` : '/');
+        router.refresh(); // データ更新を反映
       } else {
         const data = await response.json();
-        setError(data.message || '投稿に失敗しました。');
+        setError(data.message || '処理に失敗しました。');
       }
     } catch (err) {
       console.error(err);
@@ -192,18 +246,62 @@ export const CourseForm: React.FC = () => {
       setIsLoading(false);
     }
 
-  }, [status, title, description, courseItems, router]);
+  }, [status, title, description, courseItems, router, isEditMode, courseId]);
+
+  // 削除処理 (編集モードのみ)
+  const handleDelete = async () => {
+    if (!isEditMode || !confirm('本当にこのコースを削除しますか？\nこの操作は取り消せません。')) return;
+
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/courses/${courseId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        alert('削除しました。');
+
+        // ユーザーIDがあればプロフィールへ、なければトップページへ遷移
+        // (session.user.id は auth.ts で設定した文字列型のIDが入っています)
+        const userId = (session?.user as any)?.id;
+        if (userId) {
+            router.push(`/profile/${userId}`);
+        } else {
+            router.push('/');
+        }
+        
+        router.refresh();
+      } else {
+        alert('削除に失敗しました。');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('エラーが発生しました。');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 
   if (status === 'loading') { return <div className="p-8 text-center">ロード中...</div>; }
   if (status === 'unauthenticated') { return <div className="p-8 text-center text-red-500">投稿するにはログインしてください。</div>; }
 
-  // --------------------------------------------------
-  // UI: フォーム表示
-  // --------------------------------------------------
   return (
     <div className="max-w-3xl mx-auto p-8 bg-white shadow-lg rounded-lg">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">フルコース投稿</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">
+            {isEditMode ? 'フルコース編集' : 'フルコース投稿'}
+        </h1>
+        {isEditMode && (
+            <button 
+                type="button" 
+                onClick={handleDelete}
+                className="text-sm text-red-600 hover:text-red-800 underline"
+            >
+                このコースを削除する
+            </button>
+        )}
+      </div>
+
       {error && (
         <div className="p-3 mb-4 text-red-700 bg-red-100 border border-red-200 rounded">
           {error}
@@ -211,8 +309,8 @@ export const CourseForm: React.FC = () => {
       )}
 
       <form onSubmit={handleSubmit}>
+        {/* ... (既存のフォーム内容は同じ) ... */}
         
-        {/* コースタイトル (省略) */}
         <div className="mb-6">
           <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">コースタイトル (必須)</label>
           <input
@@ -225,7 +323,6 @@ export const CourseForm: React.FC = () => {
           />
         </div>
 
-        {/* コース構成セクション */}
         <div className="flex justify-between items-center mb-3">
             <h2 className="text-xl font-semibold text-gray-800">コース構成</h2>
             <button
@@ -237,7 +334,6 @@ export const CourseForm: React.FC = () => {
             </button>
         </div>
         
-        {/* コースアイテムリスト (全項目) */}
         <CourseItemList
           items={courseItems}
           onOpenModal={handleOpenModal}
@@ -247,7 +343,6 @@ export const CourseForm: React.FC = () => {
           roleOptions={roleOptions} 
         />
         
-        {/* ... (コメントと投稿ボタンは省略) ... */}
         <div className="mb-6 border border-gray-300 rounded-lg p-4 bg-gray-50 mt-6">
           <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">コメント</label>
           <textarea
@@ -259,17 +354,25 @@ export const CourseForm: React.FC = () => {
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className={`w-full py-3 text-white font-bold rounded-md transition duration-150 
-            ${isLoading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-        >
-          {isLoading ? '投稿中...' : 'フルコースを投稿'}
-        </button>
+        <div className="flex gap-4">
+            <button
+                type="button"
+                onClick={() => router.back()}
+                className="w-1/3 py-3 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-md transition duration-150"
+            >
+                キャンセル
+            </button>
+            <button
+                type="submit"
+                disabled={isLoading}
+                className={`w-2/3 py-3 text-white font-bold rounded-md transition duration-150 
+                    ${isLoading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+            >
+                {isLoading ? '送信中...' : (isEditMode ? '更新する' : '投稿する')}
+            </button>
+        </div>
       </form>
 
-      {/* 製品選択モーダルのレンダリング (エラー報告箇所) */}
       <ProductSelectionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -280,10 +383,8 @@ export const CourseForm: React.FC = () => {
   );
 };
 
-
-// --------------------------------------------------
-// 補助コンポーネント: CourseItemList (リスト表示の共通化)
-// --------------------------------------------------
+// CourseItemList コンポーネントは変更なし（そのまま使用）
+// ...
 interface CourseItemListProps {
   items: CourseItem[];
   onOpenModal: (key: string, initialRole: string) => void; 
@@ -323,12 +424,12 @@ const CourseItemList: React.FC<CourseItemListProps> = ({
             {/* 順序 */}
             <div className="w-8 text-center text-gray-500">{index + 1}</div>
 
-            {/* 💡 役割プルダウン (必須商品は無効化) */}
+            {/* 役割プルダウン */}
             <div className="w-28 font-medium text-gray-800 truncate">
                 <select
                     value={item.role}
                     onChange={(e) => onRoleChange(item.key, e.target.value)}
-                    disabled={item.isMandatory} // 💡 必須アイテムの場合は disabled
+                    disabled={item.isMandatory} 
                     className={`w-full px-1 py-1 border rounded-md text-xs 
                         ${item.isMandatory ? 'border-red-300 bg-gray-100 cursor-not-allowed' : 'border-gray-300 bg-white'}`}
                 >
@@ -339,18 +440,19 @@ const CourseItemList: React.FC<CourseItemListProps> = ({
                 {item.isMandatory && <span className="text-red-500 ml-1 text-xs">*</span>}
             </div>
             
-            {/* 商品名と画像 (メーカー表示) */}
+            {/* 商品名と画像 */}
             <div className="flex-grow flex items-center space-x-3">
               {item.productId ? (
                 <>
-                  <img 
-                    src={item.productImageUrl!} 
-                    alt={item.productName!} 
-                    className="w-8 h-8 rounded-full object-cover border border-gray-300"
-                  />
+                  {item.productImageUrl && (
+                    <img 
+                        src={item.productImageUrl} 
+                        alt={item.productName || ''} 
+                        className="w-8 h-8 rounded-full object-cover border border-gray-300"
+                    />
+                  )}
                   <div>
                     <span className="font-semibold text-gray-800">{item.productName}</span>
-                    {/* 💡 メーカー名を商品名の下に表示 (黒以外の文字色: インディゴ) */}
                     {(item.manufacturer) && (
                         <p className="text-xs text-indigo-600/90 truncate">{item.manufacturer}</p>
                     )}
@@ -365,13 +467,11 @@ const CourseItemList: React.FC<CourseItemListProps> = ({
             
             {/* 操作ボタン */}
             <div className="w-32 flex justify-end space-x-1">
-              {/* 上下移動ボタン */}
               <button
                 type="button"
                 onClick={() => onMoveItem(index, 'up')}
                 disabled={index === 0}
                 className={`text-gray-500 hover:text-blue-600 transition disabled:opacity-30 disabled:cursor-not-allowed`}
-                title="上に移動"
               >
                 ↑
               </button>
@@ -380,7 +480,6 @@ const CourseItemList: React.FC<CourseItemListProps> = ({
                 onClick={() => onMoveItem(index, 'down')}
                 disabled={index === items.length - 1}
                 className={`text-gray-500 hover:text-blue-600 transition disabled:opacity-30 disabled:cursor-not-allowed`}
-                title="下に移動"
               >
                 ↓
               </button>
@@ -389,18 +488,15 @@ const CourseItemList: React.FC<CourseItemListProps> = ({
                 type="button"
                 onClick={() => onOpenModal(item.key, item.role)} 
                 className="bg-blue-500 text-white text-xs px-2 py-1 rounded hover:bg-blue-600 transition"
-                title={item.productId ? '製品を変更' : '製品を選択'}
               >
                 {item.productId ? '変更' : '選択'}
               </button>
               
-              {/* 削除 */}
               {(item.productId || !item.isMandatory) && (
                 <button
                   type="button"
                   onClick={() => onRemoveItem(item.key)}
                   className="text-red-500 hover:text-red-700 p-1"
-                  title={item.isMandatory ? '製品を解除' : 'アイテムを削除'}
                 >
                   ×
                 </button>

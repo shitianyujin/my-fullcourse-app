@@ -1,3 +1,5 @@
+// app/api/courses/[courseId]/route.ts
+
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
@@ -8,6 +10,9 @@ interface Params {
     courseId: string;
 }
 
+// ====================================================================
+// GET: コース詳細取得 (既存のコード - 変更なし)
+// ====================================================================
 export async function GET(
     request: Request,
     { params }: { params: Params }
@@ -23,7 +28,6 @@ export async function GET(
             where: { email: session.user.email }, 
             select: { id: true } 
         });
-        // 💡 ユーザーIDを取得できたらセット
         userId = userRecord?.id ?? null;
     }
 
@@ -32,9 +36,7 @@ export async function GET(
     }
 
     try {
-        // ----------------------------------------------------
         // 1. コース情報の取得
-        // ----------------------------------------------------
         const course = await prisma.course.findUnique({
             where: { id: courseId },
             include: {
@@ -47,9 +49,7 @@ export async function GET(
             return NextResponse.json({ message: "コースが見つかりません。" }, { status: 404 });
         }
         
-        // ----------------------------------------------------
-        // 2. 評価の集計を Prisma に依頼 (Aggregation)
-        // ----------------------------------------------------
+        // 2. 評価の集計
         const ratingStats = await prisma.rating.aggregate({
             _avg: { score: true },
             _count: { score: true },
@@ -59,24 +59,19 @@ export async function GET(
         let averageRatingCalculated: number | null = null;
         let totalRatings = ratingStats._count.score;
 
-        // 平均評価のDecimal型をNumberに安全に変換
         if (ratingStats._avg.score) {
             const avgScoreValue = ratingStats._avg.score as unknown;
             averageRatingCalculated = avgScoreValue instanceof Decimal 
-                ? parseFloat(avgScoreValue.toFixed(2)) // 小数点以下2桁に丸めてNumberに変換
+                ? parseFloat(avgScoreValue.toFixed(2))
                 : (avgScoreValue as number);
         }
 
-        console.log(`[API Debug] DB Raw Avg: ${ratingStats._avg.score}, Calculated Avg: ${averageRatingCalculated}, Total Ratings: ${totalRatings}`);
-        
-        // ----------------------------------------------------
         // 3. ユーザー固有の状態チェック
-        // ----------------------------------------------------
         let isWantsToEat = false;
         let isTried = false;
         let userRatingScore: number | null = null; 
 
-        if (userId !== null) { // 💡 userIdがnullでないことを確認
+        if (userId !== null) { 
             const wantsToEatRecord = await prisma.wantsToEat.findUnique({
                 where: { courseId_userId: { courseId: courseId, userId: userId } },
             });
@@ -87,7 +82,6 @@ export async function GET(
             });
             isTried = !!triedRecord;
             
-            // ユーザーの評価チェック
             const userRatingRecord = await prisma.rating.findUnique({
                 where: { courseId_userId: { courseId: courseId, userId: userId } },
                 select: { score: true }
@@ -95,22 +89,14 @@ export async function GET(
 
             if (userRatingRecord && userRatingRecord.score !== null) {
                 const scoreValue = userRatingRecord.score as unknown; 
-                // 💡 Decimal型またはnumber型から安全に整数値を取得
                 userRatingScore = scoreValue instanceof Decimal 
-                    ? scoreValue.toNumber() // Decimalを数値に変換
+                    ? scoreValue.toNumber() 
                     : (scoreValue as number);
-                
-                // 💡 スコアが整数であることを保証
                 userRatingScore = Math.round(userRatingScore); 
             }
-
-            console.log(`[API Debug] Logged-in User ID: ${userId}, User Rating Score: ${userRatingScore}`);
         }
 
-        // ----------------------------------------------------
         // 4. 返却データ
-        // ----------------------------------------------------
-        
         const { 
             averageRating: _, 
             totalRatingsCount: __, 
@@ -119,19 +105,14 @@ export async function GET(
 
         return NextResponse.json({
             ...restOfCourse,
-            
-            // 💡 Aggregationの結果を反映
             averageRating: averageRatingCalculated,
             totalRatingsCount: totalRatings, 
-            
-            // 💡 カウントフィールドはcourseから取得
             wantsToEatCount: Math.max(0, course.wantsToEatCount ?? 0),
             triedCount: Math.max(0, course.triedCount ?? 0),
             commentCount: Math.max(0, course.commentCount ?? 0),
-
             isWantsToEat: isWantsToEat,
             isTried: isTried,
-            userRatingScore: userRatingScore, // 💡 ログインユーザーの評価スコアを返す
+            userRatingScore: userRatingScore, 
         });
 
     } catch (error) {
@@ -140,5 +121,141 @@ export async function GET(
             { message: "コース詳細の取得に失敗しました。" },
             { status: 500 }
         );
+    }
+}
+
+// ====================================================================
+// PUT: コース情報の更新 (新規追加)
+// ====================================================================
+export async function PUT(
+    request: Request,
+    { params }: { params: Params }
+) {
+    const courseId = parseInt(params.courseId, 10);
+    const session = await getServerSession(authOptions);
+
+    // 1. 認証チェック
+    if (!session || !session.user?.email) {
+        return NextResponse.json({ message: "認証が必要です" }, { status: 401 });
+    }
+
+    if (isNaN(courseId)) {
+        return NextResponse.json({ message: "無効なIDです" }, { status: 400 });
+    }
+
+    // 2. 権限チェック: 投稿者本人かどうか
+    const existingCourse = await prisma.course.findUnique({
+        where: { id: courseId },
+        include: { user: true },
+    });
+
+    if (!existingCourse) {
+        return NextResponse.json({ message: "コースが見つかりません" }, { status: 404 });
+    }
+
+    // メールアドレスで本人確認（簡易的ですが安全です）
+    if (existingCourse.user.email !== session.user.email) {
+        return NextResponse.json({ message: "編集権限がありません" }, { status: 403 });
+    }
+
+    try {
+        const body = await request.json();
+        const { title, description, courseItems } = body;
+
+        // タイトルなどは必須
+        if (!title || !courseItems) {
+             return NextResponse.json({ message: "入力内容に不備があります" }, { status: 400 });
+        }
+
+        // 3. 更新処理 (トランザクション)
+        await prisma.$transaction(async (tx) => {
+            // コース本体の更新
+            await tx.course.update({
+                where: { id: courseId },
+                data: { title, description },
+            });
+
+            // 構成要素の洗い替え（既存を削除して作り直すのが最も安全）
+            await tx.courseItem.deleteMany({
+                where: { courseId: courseId },
+            });
+
+            // 新しい構成要素を登録
+            if (courseItems.length > 0) {
+                const newItems = courseItems.map((item: any, index: number) => ({
+                    courseId: courseId,
+                    productId: item.productId,
+                    role: item.role,
+                    order: index + 1, // 1始まり
+                }));
+                await tx.courseItem.createMany({
+                    data: newItems,
+                });
+            }
+        });
+
+        return NextResponse.json({ message: "コースを更新しました" });
+
+    } catch (error) {
+        console.error("Update error:", error);
+        return NextResponse.json({ message: "更新に失敗しました" }, { status: 500 });
+    }
+}
+
+// ====================================================================
+// DELETE: コースの削除 (新規追加)
+// ====================================================================
+export async function DELETE(
+    request: Request,
+    { params }: { params: Params }
+) {
+    const courseId = parseInt(params.courseId, 10);
+    const session = await getServerSession(authOptions);
+
+    // 1. 認証チェック
+    if (!session || !session.user?.email) {
+        return NextResponse.json({ message: "認証が必要です" }, { status: 401 });
+    }
+
+    if (isNaN(courseId)) {
+        return NextResponse.json({ message: "無効なIDです" }, { status: 400 });
+    }
+
+    // 2. 権限チェック
+    const existingCourse = await prisma.course.findUnique({
+        where: { id: courseId },
+        include: { user: true },
+    });
+
+    if (!existingCourse) {
+        return NextResponse.json({ message: "コースが見つかりません" }, { status: 404 });
+    }
+
+    if (existingCourse.user.email !== session.user.email) {
+        return NextResponse.json({ message: "削除権限がありません" }, { status: 403 });
+    }
+
+    try {
+        // 3. 削除処理 (トランザクション)
+        await prisma.$transaction(async (tx) => {
+            // コース削除 (Cascade設定があれば関連データも消えますが、念のため)
+            await tx.course.delete({
+                where: { id: courseId },
+            });
+
+            // ユーザーの投稿数を減らす
+            await tx.user.update({
+                where: { id: existingCourse.userId },
+                data: {
+                    courseCount: { decrement: 1 },
+                },
+            });
+        });
+
+        return NextResponse.json({ message: "コースを削除しました" });
+
+    } catch (error) {
+        console.error("Delete error:", error);
+        return NextResponse.json({ message: "削除に失敗しました" }, { status: 500 });
     }
 }

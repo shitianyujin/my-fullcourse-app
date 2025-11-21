@@ -37,14 +37,12 @@ export async function GET(request: Request) {
       whereCondition.OR = [
         {
           name: {
-            contains: search,
-            mode: 'insensitive' as const, // 大文字小文字を区別しない
+            contains: search
           },
         },
         {
           description: {
-            contains: search,
-            mode: 'insensitive' as const,
+            contains: search
           },
         },
       ];
