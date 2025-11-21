@@ -1,24 +1,38 @@
 // app/course/[courseId]/page.tsx
+'use client';
 
-import React from 'react';
-import { notFound } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { notFound, useRouter } from 'next/navigation';
 import { 
     FaUserCircle, 
-    FaTag, 
-    FaStar, 
-    FaRegCommentDots
+    FaTag,
 } from 'react-icons/fa';
 import InteractiveBadge from '@/components/InteractiveBadge';
 import RatingButton from '@/components/RatingButton'; 
 import CommentSection from '@/components/CommentSection'; 
-import CommentBadge from '@/components/CommentBadge'; // 💡 CommentBadgeをインポート
-import { formatAverageRating } from '@/lib/utils'; // 💡 パスはご自身の環境に合わせてください
+import CommentBadge from '@/components/CommentBadge'; 
+import RatingModal from '@/components/RatingModal';
 
+interface CourseData {
+    id: number;
+    title: string;
+    description: string;
+    averageRating: number | null;
+    totalRatingsCount: number;
+    userRatingScore: number | null;
+    wantsToEatCount: number;
+    triedCount: number;
+    isWantsToEat: boolean;
+    isTried: boolean;
+    user: {
+        name: string;
+        image: string | null;
+    };
+    courseItems: Array<any>;
+}
 
-// サーバーサイドでのデータ取得関数 (変更なし)
-async function getCourse(courseId: string) {
-// ... (getCourse関数は変更なし) ...
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+async function getCourse(courseId: string): Promise<CourseData | null> {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
     
     try {
         const res = await fetch(`${baseUrl}/api/courses/${courseId}`, {
@@ -35,17 +49,63 @@ async function getCourse(courseId: string) {
     }
 }
 
-export default async function CourseDetailPage({
+export default function CourseDetailPage({
     params,
 }: {
     params: { courseId: string };
 }) {
-    const course = await getCourse(params.courseId);
+    const courseId = params.courseId;
+    const router = useRouter();
+    
+    const [course, setCourse] = useState<CourseData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    
+    useEffect(() => {
+        const fetchCourseData = async () => {
+            setIsLoading(true);
+            const data = await getCourse(courseId);
+            if (!data) {
+                router.replace('/404'); 
+                return;
+            }
+            setCourse(data);
+            setIsLoading(false);
+        };
+        fetchCourseData();
+    }, [courseId, router]);
 
-    if (!course) {
-        notFound();
+    const handleRatingSubmit = (newAverage: number, newTotalCount: number, newUserScore: number) => {
+        if (!course) return;
+
+        setCourse(prevData => {
+            if (!prevData) return null;
+            return {
+                ...prevData,
+                averageRating: newAverage,
+                totalRatingsCount: newTotalCount,
+                userRatingScore: newUserScore,
+            };
+        });
+        
+        setIsModalOpen(false);
+        router.refresh(); 
+    };
+
+    if (isLoading || !course) {
+        if (!course && !isLoading) {
+            notFound();
+        }
+        return (
+            <div className="flex justify-center items-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+                <p className="ml-3 text-gray-600">コースデータを読み込み中...</p>
+            </div>
+        );
     }
     
+    const initialUserRatingScore = course.userRatingScore ?? null;
+
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-8">
             {/* ヘッダー部分 */}
@@ -55,10 +115,19 @@ export default async function CourseDetailPage({
                     {course.title}
                 </h1>
                 
-                {/* 💡修正: スタッツ（評価・カウンター）エリア */}
+                {/* バッジエリア - 表示順を統一 */}
                 <div className="flex flex-wrap gap-3 mb-6">
                     
-                    {/* 食べたいバッジ (InteractiveBadge) */}
+                    {/* 1. 評価ボタン (RatingButton) */}
+                    <RatingButton
+                        courseId={course.id}
+                        initialAverageRating={course.averageRating}
+                        initialTotalRatingsCount={course.totalRatingsCount}
+                        initialUserRatingScore={initialUserRatingScore}
+                        onOpenModal={() => setIsModalOpen(true)}
+                    />
+                    
+                    {/* 2. 食べたいバッジ (InteractiveBadge) */}
                     <InteractiveBadge 
                         courseId={course.id} 
                         initialCount={course.wantsToEatCount}
@@ -66,7 +135,7 @@ export default async function CourseDetailPage({
                         type="wantsToEat"
                     />
 
-                    {/* 食べたよ数 (InteractiveBadge) */}
+                    {/* 3. 食べたよバッジ (InteractiveBadge) */}
                     <InteractiveBadge 
                         courseId={course.id} 
                         initialCount={course.triedCount}
@@ -74,15 +143,7 @@ export default async function CourseDetailPage({
                         type="tried"
                     />
 
-                    {/* 評価ボタン (RatingButton) */}
-                    <RatingButton
-                        courseId={course.id}
-                        initialAverageRating={course.averageRating}
-                        initialTotalRatingsCount={course.totalRatingsCount}
-                        initialUserRatingScore={course.userRatingScore}
-                    />
-
-                    {/* 💡 CommentBadgeを配置 */}
+                    {/* 4. コメントバッジ (CommentBadge) */}
                     <CommentBadge courseId={course.id} />
                 </div>
 
@@ -109,7 +170,7 @@ export default async function CourseDetailPage({
                 コース構成
             </h2>
             
-              <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-300 before:to-transparent">
+             <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-300 before:to-transparent">
                 {course.courseItems.map((item: any, index: number) => (
                     <div key={item.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                         
@@ -161,12 +222,22 @@ export default async function CourseDetailPage({
                 ))}
             </div>
 
-            {/* 💡 コメントセクションの組み込み */}
+            {/* コメントセクション */}
             <div className="mt-12 pt-8 border-t border-gray-200" id="comments">
                 <CommentSection
                     courseId={course.id}
                 />
             </div>
+
+            {/* RatingModal */}
+            {isModalOpen && (
+                <RatingModal 
+                    courseId={course.id}
+                    initialScore={initialUserRatingScore}
+                    onClose={() => setIsModalOpen(false)}
+                    onSubmit={handleRatingSubmit}
+                />
+            )}
         </div>
     );
 }

@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { FaHeart, FaSpinner, FaCheck } from 'react-icons/fa'; // FaCheckをインポート
+import { FaHeart, FaSpinner, FaUtensils } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 
 interface InteractiveBadgeProps {
@@ -34,7 +34,7 @@ export default function InteractiveBadge({
         },
         tried: {
             apiPath: `/api/courses/${courseId}/tried`,
-            icon: FaCheck,
+            icon: FaUtensils,
             text: '食べた',
             baseColor: 'green',
         },

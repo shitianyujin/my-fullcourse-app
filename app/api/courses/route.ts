@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { Decimal } from '@prisma/client/runtime/library';
 
 // フルコース投稿リクエストボディの型定義
 interface CourseItemData {
@@ -138,27 +139,65 @@ export async function GET(request: Request) {
       take: limit,
       skip: skip,
       orderBy: { createdAt: 'desc' },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        wantsToEatCount: true,
+        triedCount: true,
+        createdAt: true,
         user: {
-          select: { name: true, image: true },
-        },
-        // 一覧表示用に、コース内のアイテム（特に画像）を一部取得
-        courseItems: {
-          orderBy: { order: 'asc' },
-          take: 4, // サムネイルとして最大4つまで製品画像を表示
-          include: {
-            product: {
-              select: { imageUrl: true },
-            },
+          select: { 
+            id: true,
+            name: true, 
+            image: true 
           },
         },
+        _count: {
+          select: {
+            courseItems: true,
+          }
+        }
       },
     });
+
+    // 各コースの評価をリアルタイムで集計
+    const formattedCourses = await Promise.all(courses.map(async (course) => {
+      const ratingStats = await prisma.rating.aggregate({
+        _avg: { score: true },
+        _count: { score: true },
+        where: { courseId: course.id }
+      });
+
+      let averageRatingNumber: number | null = null;
+      
+      if (ratingStats._avg.score) {
+        const avgScoreValue = ratingStats._avg.score as unknown;
+        averageRatingNumber = avgScoreValue instanceof Decimal 
+          ? parseFloat((avgScoreValue as Decimal).toFixed(1))
+          : (avgScoreValue as number);
+      }
+
+      return {
+        id: course.id,
+        title: course.title,
+        description: course.description,
+        averageRating: averageRatingNumber,
+        totalRatingsCount: ratingStats._count.score,
+        wantsToEatCount: course.wantsToEatCount,
+        triedCount: course.triedCount,
+        createdAt: course.createdAt,
+        user: course.user,
+        _count: {
+          courseItems: course._count.courseItems
+        }
+      };
+    }));
 
     const total = await prisma.course.count();
 
     return NextResponse.json({
-      courses,
+      courses: formattedCourses,
       total,
       page,
       totalPages: Math.ceil(total / limit),

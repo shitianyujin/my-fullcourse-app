@@ -1,22 +1,26 @@
 // app/page.tsx
 import Link from 'next/link';
-import { FaUserCircle, FaUtensils, FaArrowRight } from 'react-icons/fa';
+import { FaUtensils, FaArrowRight } from 'react-icons/fa';
+import CourseCard from '@/components/CourseCard';
 
 // コースの型定義
 interface CourseSummary {
   id: number;
   title: string;
   description: string;
+  averageRating: number | null;
+  totalRatingsCount: number;
+  wantsToEatCount: number;
+  triedCount: number;
   createdAt: string;
   user: {
-    name: string | null;
+    id: number;
+    name: string;
     image: string | null;
   };
-  courseItems: {
-    product: {
-      imageUrl: string | null;
-    } | null;
-  }[];
+  _count: {
+    courseItems: number;
+  };
 }
 
 // データ取得関数
@@ -54,60 +58,11 @@ export default async function Home() {
       {courses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {courses.map((course) => (
-            <Link href={`/course/${course.id}`} key={course.id} className="group">
-              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300 h-full flex flex-col">
-                
-                {/* サムネイルエリア (コース内の製品画像をコラージュ風に表示) */}
-                <div className="h-48 bg-gray-100 relative flex flex-wrap gap-0.5 p-0.5 overflow-hidden">
-                   {course.courseItems.length > 0 ? (
-                     course.courseItems.slice(0, 4).map((item, i) => (
-                       item.product?.imageUrl ? (
-                         <div key={i} className="flex-1 min-w-[45%] h-full relative">
-                            <img 
-                              src={item.product.imageUrl} 
-                              alt="product" 
-                              className="absolute inset-0 w-full h-full object-cover"
-                            />
-                         </div>
-                       ) : (
-                         <div key={i} className="flex-1 min-w-[45%] h-full bg-gray-200 flex items-center justify-center text-gray-400">
-                           <FaUtensils />
-                         </div>
-                       )
-                     ))
-                   ) : (
-                     <div className="w-full h-full flex items-center justify-center text-gray-400">
-                       <span className="text-sm">No Images</span>
-                     </div>
-                   )}
-                   {/* オーバーレイ (ホバー時) */}
-                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity" />
-                </div>
-
-                {/* カード本文 */}
-                <div className="p-5 flex-1 flex flex-col">
-                  <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                    {course.title}
-                  </h3>
-                  <p className="text-gray-600 text-sm line-clamp-3 mb-4 flex-1">
-                    {course.description}
-                  </p>
-                  
-                  {/* フッター: ユーザー情報と日付 */}
-                  <div className="flex items-center justify-between text-sm text-gray-500 mt-auto pt-4 border-t border-gray-100">
-                    <div className="flex items-center">
-                      {course.user.image ? (
-                        <img src={course.user.image} alt={course.user.name || ''} className="w-6 h-6 rounded-full mr-2" />
-                      ) : (
-                        <FaUserCircle className="w-6 h-6 mr-2 text-gray-400" />
-                      )}
-                      <span className="truncate max-w-[100px]">{course.user.name || '名無し'}</span>
-                    </div>
-                    <span>{new Date(course.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              </div>
-            </Link>
+            <CourseCard
+              key={course.id}
+              course={course}
+              showEditButton={false}
+            />
           ))}
         </div>
       ) : (
@@ -119,7 +74,7 @@ export default async function Home() {
           <div className="mt-6">
             <Link
               href="/create"
-              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
+              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
             >
               <FaArrowRight className="mr-2 -ml-1 h-5 w-5" />
               投稿を作成する
