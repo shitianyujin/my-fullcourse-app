@@ -20,7 +20,7 @@ datasource db {
 // 1. ユーザー (users)
 model User {
   id                 Int                 @id @default(autoincrement())
-  name               String              @db.VarChar(100)
+  name               String?             @db.VarChar(100)
   email              String              @unique @db.VarChar(100) // 認証用のユニークメールアドレス
   hashedPassword     String?             @db.VarChar(255) @map("hashed_password")// パスワードハッシュを格納するカラム(Auth.js関連)
   image              String?             @db.VarChar(255)

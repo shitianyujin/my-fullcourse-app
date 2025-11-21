@@ -1,11 +1,13 @@
+// app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Navbar } from '@/components/Navbar'; 
-import { Footer } from '@/components/Footer'; // 追加
+import { Footer } from '@/components/Footer';
+import { OnboardingGuard } from "@/components/OnboardingGuard"; // 💡 追加
 
 export const metadata: Metadata = {
-  title: "MyFullCourseApp",
+  title: "My Fullcourse App",
   description: "次に行くべきフルコースを管理するアプリ",
 };
 
@@ -16,18 +18,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      {/* 
-        h-full, min-h-screen, flex-col を設定し、
-        コンテンツが少ない場合でもFooterが最下部に来るようにする 
-      */}
       <body className="min-h-screen flex flex-col bg-gray-50">
         <Providers>
-          <Navbar />
-          {/* NavbarとFooterの間で余白を埋める */}
-          <main className="flex-grow">
-            {children}
-          </main>
-          <Footer />
+          {/* 💡 Navbarの前にガードを配置しても良いですが、
+              Navbarを表示しつつコンテンツだけ隠すか、
+              全体をガードするかは選択できます。
+              ここでは「全体」をガードの下に置き、Navbarは表示される構成にします。
+           */}
+          <OnboardingGuard>
+            <Navbar />
+            <main className="flex-grow">
+              {children}
+            </main>
+            <Footer />
+          </OnboardingGuard>
         </Providers>
       </body>
     </html>
