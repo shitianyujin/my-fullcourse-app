@@ -218,6 +218,7 @@ enum SubmissionType {
   REQUEST     // 要望
   BUG_REPORT  // 不具合報告
   ACCOUNT     // アカウント関連
+  PRODUCT_REQUEST // 商品追加依頼
   OTHER       // その他
 }
 
