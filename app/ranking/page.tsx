@@ -15,6 +15,11 @@ async function getRankings() {
     take: 10,
     include: {
       user: { select: { id: true, name: true, image: true } },
+      courseItems: {
+        where: { role: 'メインディッシュ' },
+        take: 2,
+        include: { product: { select: { imageUrl: true } } }
+      }
     }
   });
 

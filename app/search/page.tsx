@@ -63,7 +63,11 @@ async function getCourses({
       take: PAGE_SIZE,
       include: {
         user: { select: { id: true, name: true, image: true } },
-        // 商品名検索のために必要だが、CourseCard表示には直接使わないためincludeは最小限でOK
+        courseItems: {
+          where: { role: 'メインディッシュ' },
+          take: 2,
+          include: { product: { select: { imageUrl: true } } }
+        }
       },
     }),
     prisma.course.count({ where }),

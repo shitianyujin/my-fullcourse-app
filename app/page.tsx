@@ -2,10 +2,25 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { FaArrowRight, FaCrown, FaSearch } from "react-icons/fa";
+// 💡 修正: キラキラアイコンを bs パッケージからインポート
+import { BsStars } from "react-icons/bs"; 
 import CourseCard from "@/components/CourseCard";
 
 // データ取得関数
 async function getHomeData() {
+  // 共通のinclude設定
+  const commonInclude = {
+    user: { select: { id: true, name: true, image: true } },
+    // 💡 追加: メインディッシュの画像を最大2枚取得
+    courseItems: {
+      where: { role: 'メインディッシュ' },
+      take: 2,
+      include: {
+        product: { select: { imageUrl: true } }
+      }
+    }
+  };
+
   // 1. 人気ランキング TOP3
   const rankingCourses = await prisma.course.findMany({
     orderBy: [
@@ -13,18 +28,14 @@ async function getHomeData() {
       { createdAt: 'desc' }
     ],
     take: 3,
-    include: {
-      user: { select: { id: true, name: true, image: true } },
-    }
+    include: commonInclude,
   });
 
   // 2. 新着コース TOP6
   const latestCourses = await prisma.course.findMany({
     orderBy: { createdAt: 'desc' },
     take: 6,
-    include: {
-      user: { select: { id: true, name: true, image: true } },
-    }
+    include: commonInclude,
   });
 
   return { rankingCourses, latestCourses };
@@ -59,7 +70,6 @@ export default async function Home() {
             みんなのフルコースを<br className="hidden sm:inline" />見つけよう
           </h1>
           
-          {/* 💡 ご要望の改行を反映 */}
           <p className="text-lg sm:text-xl text-indigo-100 mb-10 leading-relaxed">
             最高の組み合わせ、こだわりの逸品。<br />
             あなただけの特別なフルコースを共有し、<br className="sm:hidden" />
@@ -103,10 +113,10 @@ export default async function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {rankingCourses.map((course, index) => (
-              <div key={course.id} className="relative">
+              <div key={course.id} className="relative transform transition hover:-translate-y-1">
                 {/* 1位〜3位のバッジ */}
-                <div className="absolute -top-3 -left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md
-                  ${index === 0 ? 'bg-yellow-400' : index === 1 ? 'bg-gray-400' : 'bg-orange-400'}"
+                <div 
+                  className="absolute -top-3 -left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-md border-2 border-white"
                   style={{ backgroundColor: index === 0 ? '#FACC15' : index === 1 ? '#9CA3AF' : '#FB923C' }}
                 >
                   {index + 1}
@@ -120,29 +130,41 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 3. 新着コースセクション */}
-        <section className="py-16">
+        {/* 3. 新着コースセクション (デザイン強化) */}
+        <section className="py-16 my-8 bg-gray-50 rounded-3xl px-4 sm:px-8">
           <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold text-gray-900">新着のフルコース</h2>
-            <p className="text-gray-500 text-sm mt-1">最近投稿されたこだわりの組み合わせ</p>
+            <h2 className="text-2xl font-bold text-gray-900 flex justify-center items-center gap-2">
+              {/* 💡 修正: FaSparkles -> BsStars */}
+              <BsStars className="text-yellow-400 text-3xl" />
+              新着のフルコース
+              <BsStars className="text-yellow-400 text-3xl" />
+            </h2>
+            <p className="text-gray-500 text-sm mt-2">できたてのこだわりコースをチェック！</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {latestCourses.map((course) => (
-              <CourseCard key={course.id} course={formatForCard(course)} />
+              <div key={course.id} className="relative group">
+                {/* NEWバッジ */}
+                <div className="absolute -top-2 -right-2 z-10 bg-rose-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md border-2 border-white transform rotate-12 group-hover:rotate-0 transition-transform">
+                  NEW
+                </div>
+                <CourseCard course={formatForCard(course)} />
+              </div>
             ))}
             {latestCourses.length === 0 && (
               <p className="col-span-3 text-center text-gray-500 py-8">まだ投稿がありません。最初の投稿者になりましょう！</p>
             )}
           </div>
 
-          {/* もっと見るボタン（ページネーション未実装のため、とりあえずランキングへ誘導するか、将来的な一覧ページへ） */}
           {latestCourses.length >= 6 && (
             <div className="text-center mt-10">
-               {/* ※将来的に /courses 一覧ページを作るならそこへリンク */}
-              <button disabled className="px-6 py-2 border border-gray-300 rounded-full text-gray-400 text-sm cursor-not-allowed">
-                もっと見る (Coming Soon)
-              </button>
+              <Link 
+                href="/search" 
+                className="px-8 py-2.5 bg-white border border-gray-300 text-gray-600 font-medium rounded-full hover:bg-gray-50 hover:text-indigo-600 hover:border-indigo-300 transition shadow-sm inline-flex items-center"
+              >
+                もっと見る <FaArrowRight className="ml-2 text-xs" />
+              </Link>
             </div>
           )}
         </section>

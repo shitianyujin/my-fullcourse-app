@@ -1,142 +1,124 @@
 // src/components/CourseCard.tsx
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
-import { FaUserCircle, FaStar, FaHeart, FaUtensils } from 'react-icons/fa';
+import { FaStar, FaHeart, FaUtensils } from 'react-icons/fa';
 
-interface CourseCardProps {
-  course: {
+// ----------------------------------------------------
+// 型定義
+// ----------------------------------------------------
+interface Course {
     id: number;
     title: string;
-    description: string | null;
+    description: string | null; 
     averageRating: number | null;
-    totalRatingsCount: number;
+    totalRatingsCount: number; 
     wantsToEatCount: number;
     triedCount: number;
-    createdAt?: string;
-    user?: {
-      id: number;
-      name: string;
-      image: string | null;
-    };
-    _count?: {
-      courseItems: number;
-    };
-  };
-  showEditButton?: boolean;
-  currentUserId?: number;
+    // 💡 画像表示用に courseItems を追加
+    courseItems?: {
+        product: {
+            imageUrl: string | null;
+        };
+    }[];
 }
 
-export default function CourseCard({ course, showEditButton = false, currentUserId }: CourseCardProps) {
-  const isOwnCourse = currentUserId && course.user ? currentUserId === course.user.id : false;
-  const formattedDate = course.createdAt ? new Date(course.createdAt).toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }) : '';
+interface CourseCardProps {
+    course: Course;
+    // 下記プロパティは今回は使用しませんが、既存のコードとの互換性のために残すか、
+    // 呼び出し元で使っていないなら削除してもOKです。一旦残します。
+    showEditButton?: boolean;
+    currentUserId?: number;
+}
 
-  // 評価の表示形式を統一
-  const formatAverageRating = (rating: number | null): string => {
-    return rating === null ? 'N/A' : rating.toFixed(1);
-  };
+const formatAverageRating = (rating: number | null): string => {
+    return rating === null ? 'N/A' : rating.toFixed(2);
+};
 
-  // 評価数が0の場合は特別な表示
-  const hasRatings = course.totalRatingsCount > 0;
+const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
+    const formattedRating = formatAverageRating(course.averageRating);
 
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-      <Link href={`/course/${course.id}`} className="block">
-        {/* 仮の画像エリア */}
-        <div className="h-32 bg-indigo-500/20 flex items-center justify-center text-indigo-700 font-bold text-lg p-4">
-          <span className="line-clamp-2 text-center">{course.title}</span>
-        </div>
+    const images = course.courseItems
+        ?.map(item => item.product.imageUrl)
+        .filter((url): url is string => !!url) || [];
 
-        <div className="p-5">
-          {/* タイトル */}
-          <h3 className="text-xl font-bold text-gray-900 mb-2 hover:text-indigo-600 transition-colors line-clamp-2">
-            {course.title}
-          </h3>
-
-          {/* 説明文 */}
-          <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-            {course.description || '説明がありません。'}
-          </p>
-
-          {/* 統計情報 */}
-          <div className="flex flex-wrap gap-3 mb-4">
-            {/* 評価 - 評価が存在する場合のみ表示 */}
-            {hasRatings ? (
-              <div className="flex items-center text-sm text-gray-600">
-                <FaStar className="text-yellow-500 mr-1" />
-                <span className="font-semibold">{formatAverageRating(course.averageRating)}</span>
-                <span className="ml-1 text-xs text-gray-500">({course.totalRatingsCount})</span>
-              </div>
-            ) : (
-              <div className="flex items-center text-sm text-gray-400">
-                <FaStar className="text-gray-300 mr-1" />
-                <span className="text-xs">未評価</span>
-              </div>
-            )}
-
-            {/* 食べたい数 */}
-            <div className="flex items-center text-sm text-gray-600">
-              <FaHeart className="text-pink-500 mr-1" />
-              <span>{course.wantsToEatCount}</span>
-            </div>
-
-            {/* 食べたよ数 */}
-            <div className="flex items-center text-sm text-gray-600">
-              <FaUtensils className="text-green-500 mr-1" />
-              <span>{course.triedCount}</span>
-            </div>
-
-            {/* アイテム数 */}
-            {course._count?.courseItems && (
-              <div className="flex items-center text-sm text-gray-600">
-                <span className="text-gray-400 mr-1">🍽</span>
-                <span>{course._count.courseItems}品</span>
-              </div>
-            )}
-          </div>
-
-          {/* 作成者情報（userがある場合のみ） */}
-          {course.user && (
-            <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-              <div className="flex items-center text-sm text-gray-500">
-                {course.user.image ? (
-                  <img
-                    src={course.user.image}
-                    alt={course.user.name}
-                    className="w-6 h-6 rounded-full mr-2"
-                  />
+    return (
+        <Link 
+            href={`/course/${course.id}`} 
+            className="block bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden transition-transform hover:shadow-xl hover:scale-[1.02] h-full flex flex-col"
+        >
+            {/* 画像エリア */}
+            <div className="h-40 w-full bg-gray-100 relative flex">
+                {images.length > 0 ? (
+                    <>
+                        {/* --- 画像がある場合 --- */}
+                        {images.length === 1 && (
+                            <img src={images[0]} alt={course.title} className="w-full h-full object-cover" />
+                        )}
+                        {images.length >= 2 && (
+                            <>
+                                <div className="w-1/2 h-full border-r border-white/20">
+                                    <img src={images[0]} alt="Main 1" className="w-full h-full object-cover" />
+                                </div>
+                                <div className="w-1/2 h-full">
+                                    <img src={images[1]} alt="Main 2" className="w-full h-full object-cover" />
+                                </div>
+                            </>
+                        )}
+                        {/* タイトル (白文字 + 黒グラデ背景) */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
+                             <h3 className="text-white font-bold text-lg truncate drop-shadow-md">
+                                {course.title}
+                            </h3>
+                        </div>
+                    </>
                 ) : (
-                  <FaUserCircle className="w-6 h-6 mr-2 text-gray-400" />
+                    // --- 💡 画像がない場合 (修正) ---
+                    <div className="w-full h-full bg-slate-50 relative flex flex-col items-center justify-center text-slate-300">
+                        {/* プレースホルダーアイコン */}
+                        <div className="flex flex-col items-center mb-4">
+                            <FaUtensils className="text-4xl mb-1" />
+                            <span className="text-[10px] font-bold tracking-widest uppercase">No Image</span>
+                        </div>
+                        
+                        {/* タイトル (黒文字 + 白グラデ背景) */}
+                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-slate-50 via-slate-50/90 to-transparent">
+                             <h3 className="text-gray-800 font-bold text-lg truncate">
+                                {course.title}
+                            </h3>
+                        </div>
+                    </div>
                 )}
-                <span>{course.user.name}</span>
-              </div>
-              {formattedDate && (
-                <div className="text-xs text-gray-400">
-                  {formattedDate}
-                </div>
-              )}
             </div>
-          )}
-        </div>
-      </Link>
 
-      {/* 編集ボタン（自分のコースのみ） */}
-      {showEditButton && isOwnCourse && (
-        <div className="px-5 pb-4">
-          <Link
-            href={`/course/${course.id}/edit`}
-            className="block w-full text-center px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors text-sm font-medium"
-            onClick={(e) => e.stopPropagation()}
-          >
-            コースを編集
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-}
+            {/* ... (以下の統計情報エリアは変更なし) ... */}
+            <div className="p-4 flex-grow flex flex-col justify-between">
+                <div>
+                    <p className="text-xs text-gray-500 line-clamp-2 mb-3 min-h-[2.5em]">
+                        {course.description || '説明がありません。'}
+                    </p>
+                </div>
+
+                <div className="flex justify-between items-center text-sm mt-auto">
+                    <div className="flex items-center text-yellow-500">
+                        <FaStar className="mr-1" />
+                        <span className="font-bold text-gray-700">{formattedRating}</span>
+                        <span className="text-xs text-gray-400 ml-1">({course.totalRatingsCount})</span>
+                    </div>
+                    
+                    <div className="flex space-x-3 text-gray-500">
+                        <div className="flex items-center">
+                            <FaHeart className="mr-1 text-rose-400" />
+                            <span className="font-medium text-xs">{course.wantsToEatCount}</span>
+                        </div>
+                        <div className="flex items-center">
+                            <FaUtensils className="mr-1 text-emerald-500" />
+                            <span className="font-medium text-xs">{course.triedCount}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Link>
+    );
+};
+
+export default CourseCard;

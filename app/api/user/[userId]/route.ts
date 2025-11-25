@@ -52,6 +52,16 @@ export async function GET(
                 bio: true,
                 courseCount: true,
                 createdAt: true,
+                courses: {
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        courseItems: {
+                            where: { role: 'メインディッシュ' },
+                            take: 2,
+                            include: { product: { select: { imageUrl: true } } }
+                        }
+                    }
+                }
             }
         });
 
