@@ -5,6 +5,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { ProductSelectionModal } from './ProductSelectionModal';
+import Link from 'next/link';
+import { FaLock } from 'react-icons/fa';
 
 interface CourseItem {
   key: string; 
@@ -283,7 +285,40 @@ export const CourseForm: React.FC<CourseFormProps> = ({ courseId, initialData })
 
 
   if (status === 'loading') { return <div className="p-8 text-center">ロード中...</div>; }
-  if (status === 'unauthenticated') { return <div className="p-8 text-center text-red-500">投稿するにはログインしてください。</div>; }
+  if (status === 'unauthenticated') { 
+    return (
+      <div className="max-w-3xl mx-auto p-4 md:p-8">
+        <div className="bg-white shadow-lg rounded-xl p-10 text-center border border-gray-200">
+          <div className="bg-gray-100 p-4 rounded-full inline-flex items-center justify-center mb-6">
+            <FaLock className="text-gray-500 text-3xl" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">
+            投稿するにはログインが必要です
+          </h2>
+          <p className="text-gray-600 mb-8 leading-relaxed">
+            あなただけのフルコースを作成して共有しましょう。<br className="hidden md:inline" />
+            アカウントをお持ちでない方は、無料で登録できます。
+          </p>
+          
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            {/* ログイン後は元のページ(/create)に戻るように callbackUrl を設定 */}
+            <Link
+              href={`/login?callbackUrl=${encodeURIComponent(isEditMode ? `/course/${courseId}/edit` : '/create')}`}
+              className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-full hover:bg-indigo-700 transition shadow-md flex items-center justify-center"
+            >
+              ログインする
+            </Link>
+            <Link
+              href={`/login?view=magiclink&callbackUrl=${encodeURIComponent(isEditMode ? `/course/${courseId}/edit` : '/create')}`}
+              className="px-8 py-3 bg-white text-indigo-600 font-bold rounded-full border border-indigo-600 hover:bg-indigo-50 transition shadow-sm flex items-center justify-center"
+            >
+              新規登録する
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto p-8 bg-white shadow-lg rounded-lg">
