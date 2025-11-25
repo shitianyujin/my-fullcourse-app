@@ -2,8 +2,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { FaSearch, FaTimes } from 'react-icons/fa';
+// 💡 Linkコンポーネントではなく、別タブ遷移のため通常のaタグを使いますが、
+// Next.jsのLinkでもtarget="_blank"は使えるのでimportしておきます（今回はaタグで実装します）
+import { FaSearch, FaTimes, FaExternalLinkAlt } from 'react-icons/fa'; // 💡 アイコン追加
 
+// ... (Product インターフェースなどは変更なし) ...
 interface Product {
     id: number;
     name: string;
@@ -25,71 +28,58 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
     onProductSelect,
     initialRole
 }) => {
+    // ... (state定義やuseEffectなどは変更なし) ...
     if (!isOpen) return null;
 
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-
-    // メーカー関連の状態
     const [allManufacturers, setAllManufacturers] = useState<string[]>([]);
     const [manufacturerFilter, setManufacturerFilter] = useState<string>('');
 
-    // 1. 初回ロード時: メーカー一覧を取得する
+    // ... (fetchManufacturers, fetchProducts, useEffect などは変更なし) ...
+    // 既存のロジックをそのまま維持してください
+    
+    // 1. 初回ロード時
     useEffect(() => {
         const fetchManufacturers = async () => {
             try {
-                // メーカー一覧を取得するためのAPIエンドポイント
-                // (製品APIが全件取得に対応しているか、専用エンドポイントが必要ですが、
-                //  ここでは既存の products API を使ってユニークなメーカーを抽出する簡易実装とします)
-                const response = await fetch('/api/products?limit=1000'); // 多めに取得
+                const response = await fetch('/api/products?limit=1000'); 
                 if (response.ok) {
                     const data = await response.json();
                     const allProds: Product[] = data.products || [];
-                    
-                    // メーカーリストの抽出 (重複排除とソート)
                     const manufacturers = Array.from(new Set(
-                        allProds
-                            .map(p => p.manufacturer)
-                            .filter(m => m) // null/empty除外
+                        allProds.map(p => p.manufacturer).filter(m => m)
                     )).sort();
-                    
                     setAllManufacturers(manufacturers);
                 }
             } catch (e) {
                 console.error("メーカー一覧取得エラー", e);
             }
         };
-
         if (isOpen) {
             fetchManufacturers();
-            // モーダルを開いた直後に全件（または検索条件なし）で表示したい場合はここでも fetchProducts を呼ぶ
             fetchProducts('', ''); 
         }
-    }, [isOpen]); // isOpenが変わったときだけ実行
+    }, [isOpen]); 
 
     // 2. 製品検索ロジック
     const fetchProducts = useCallback(async (keyword: string, manufacturer: string) => {
         setLoading(true);
-        
-        // クエリパラメータの構築
         const params = new URLSearchParams();
         if (keyword) params.append('search', keyword);
-        if (manufacturer) params.append('manufacturer', manufacturer); // API側で対応が必要
-        params.append('limit', '50'); // 表示件数制限
+        if (manufacturer) params.append('manufacturer', manufacturer); 
+        params.append('limit', '50');
 
         try {
             const response = await fetch(`/api/products?${params.toString()}`);
             if (response.ok) {
                 const data = await response.json();
                 let fetchedProducts: Product[] = data.products || [];
-                
-                // API側でメーカー絞り込みが実装されていない場合のフォールバック (クライアントサイドフィルタリング)
                 if (manufacturer) {
                     fetchedProducts = fetchedProducts.filter(p => p.manufacturer === manufacturer);
                 }
-
                 setProducts(fetchedProducts);
             } else {
                 setProducts([]);
@@ -102,7 +92,7 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
         }
     }, []);
 
-    // 検索語またはフィルター変更時の副作用
+    // 検索タイマー
     useEffect(() => {
         if (!isOpen) return;
         const timer = setTimeout(() => {
@@ -117,7 +107,6 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
 
     const handleAddItemToCourse = () => {
         if (!selectedProduct) return;
-
         onProductSelect(
             selectedProduct.id,
             selectedProduct.name,
@@ -125,8 +114,6 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
             initialRole,
             selectedProduct.manufacturer || ''
         );
-
-        // リセットして閉じる
         setSelectedProduct(null);
         setSearch('');
         setProducts([]);
@@ -151,7 +138,6 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
 
                 {/* フィルターエリア */}
                 <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                    {/* 検索バー */}
                     <div className="relative flex-grow">
                         <input
                             type="text"
@@ -162,8 +148,6 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
                         />
                         <FaSearch className="absolute left-3 top-3.5 text-gray-400" />
                     </div>
-
-                    {/* メーカー選択プルダウン */}
                     <div className="sm:w-48 flex-shrink-0">
                         <select
                             value={manufacturerFilter}
@@ -187,7 +171,16 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
                         </div>
                     ) : products.length === 0 ? (
                         <div className="flex flex-col justify-center items-center h-full text-gray-500">
-                            <p>条件に一致する商品は見つかりませんでした。</p>
+                            <p className="mb-3">条件に一致する商品は見つかりませんでした。</p>
+                            {/* 💡 0件時の誘導リンク */}
+                            <a 
+                                href="/request-product" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="flex items-center text-indigo-600 hover:underline text-sm font-medium bg-white px-4 py-2 rounded-full shadow-sm border border-indigo-100"
+                            >
+                                商品追加依頼はこちら <FaExternalLinkAlt className="ml-2 text-xs" />
+                            </a>
                         </div>
                     ) : (
                         <div className="divide-y divide-gray-100">
@@ -224,7 +217,7 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
                     )}
                 </div>
 
-                {/* フッター (選択情報とボタン) */}
+                {/* フッター */}
                 <div className="pt-2 border-t">
                     {selectedProduct ? (
                          <div className="flex items-center justify-between mb-4 bg-blue-50 p-3 rounded-lg border border-blue-100">
@@ -248,6 +241,22 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
                     >
                         決定
                     </button>
+
+                    {/* 💡 フッター下部の誘導リンク */}
+                    <div className="mt-3 text-center">
+                        <p className="text-xs text-gray-400">
+                            探している商品が見つからない場合は 
+                            <a 
+                                href="/request-product" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-indigo-500 hover:text-indigo-700 hover:underline ml-1"
+                            >
+                                追加依頼
+                            </a>
+                            をお願いします
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

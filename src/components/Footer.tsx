@@ -30,7 +30,7 @@ export const Footer: React.FC = () => {
               <Link href="/ranking" className="text-gray-600 hover:text-blue-600 transition">
                 ランキング
               </Link>
-              <Link href="/" className="text-gray-600 hover:text-blue-600 transition">
+              <Link href="/search" className="text-gray-600 hover:text-blue-600 transition">
                 コースを探す
               </Link>
             </div>
