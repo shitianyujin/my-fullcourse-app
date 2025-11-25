@@ -5,11 +5,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation'; 
-import { FaUserCircle, FaSignOutAlt, FaPlusCircle, FaUser, FaChevronDown } from 'react-icons/fa';
+// 💡 FaCog (歯車アイコン) を追加
+import { FaUserCircle, FaSignOutAlt, FaPlusCircle, FaUser, FaChevronDown, FaCog } from 'react-icons/fa';
 
 export const Navbar: React.FC = () => {
   const { data: session, status } = useSession();
-  const router = useRouter();
   const currentPath = usePathname();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
@@ -17,7 +17,7 @@ export const Navbar: React.FC = () => {
 
   const isLoading = status === 'loading';
 
-  // ユーザーIDを取得
+  // ユーザーIDを取得 (変更なし)
   useEffect(() => {
     const fetchUserId = async () => {
       if (session?.user?.email) {
@@ -35,7 +35,7 @@ export const Navbar: React.FC = () => {
     fetchUserId();
   }, [session]);
 
-  // ドロップダウン外クリックで閉じる
+  // ドロップダウン外クリックで閉じる (変更なし)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -51,7 +51,7 @@ export const Navbar: React.FC = () => {
     };
   }, [isDropdownOpen]);
 
-  // ログアウト処理
+  // ログアウト処理 (変更なし)
   const handleSignOut = async () => {
     setIsDropdownOpen(false);
     await signOut({ callbackUrl: '/' });
@@ -70,7 +70,7 @@ export const Navbar: React.FC = () => {
           {/* 2. 右側の認証ステータスとボタン */}
           <div className="flex items-center space-x-4">
             
-            {/* 💡 ログインしている場合のみ「投稿」ボタンを表示 */}
+            {/* ログインしている場合のみ「投稿」ボタンを表示 */}
             {session && (
               <Link 
                 href="/create" 
@@ -107,6 +107,19 @@ export const Navbar: React.FC = () => {
                 {/* ドロップダウンメニュー */}
                 {isDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    
+                    {/* 💡 管理者メニュー (isAdminがtrueの場合のみ表示) */}
+                    {(session.user as any).isAdmin && (
+                        <Link
+                            href="/admin"
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 transition border-b border-gray-100"
+                            onClick={() => setIsDropdownOpen(false)}
+                        >
+                            <FaCog className="mr-2 text-gray-500" />
+                            管理画面
+                        </Link>
+                    )}
+
                     {currentUserId && (
                       <Link
                         href={`/profile/${currentUserId}`}
