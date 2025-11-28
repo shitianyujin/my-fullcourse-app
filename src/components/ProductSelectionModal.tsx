@@ -2,11 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-// 💡 Linkコンポーネントではなく、別タブ遷移のため通常のaタグを使いますが、
-// Next.jsのLinkでもtarget="_blank"は使えるのでimportしておきます（今回はaタグで実装します）
-import { FaSearch, FaTimes, FaExternalLinkAlt } from 'react-icons/fa'; // 💡 アイコン追加
+import { FaSearch, FaTimes, FaExternalLinkAlt } from 'react-icons/fa';
 
-// ... (Product インターフェースなどは変更なし) ...
 interface Product {
     id: number;
     name: string;
@@ -28,9 +25,7 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
     onProductSelect,
     initialRole
 }) => {
-    // ... (state定義やuseEffectなどは変更なし) ...
-    if (!isOpen) return null;
-
+    // 💡 修正: フックは条件分岐の前に必ず宣言する
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
@@ -38,9 +33,6 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
     const [allManufacturers, setAllManufacturers] = useState<string[]>([]);
     const [manufacturerFilter, setManufacturerFilter] = useState<string>('');
 
-    // ... (fetchManufacturers, fetchProducts, useEffect などは変更なし) ...
-    // 既存のロジックをそのまま維持してください
-    
     // 1. 初回ロード時
     useEffect(() => {
         const fetchManufacturers = async () => {
@@ -58,11 +50,13 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
                 console.error("メーカー一覧取得エラー", e);
             }
         };
+        
+        // モーダルが開かれたタイミングで実行
         if (isOpen) {
             fetchManufacturers();
             fetchProducts('', ''); 
         }
-    }, [isOpen]); 
+    }, [isOpen]); // ここではfetchProductsを依存配列に入れず、下で定義する関数を使う（循環参照回避のため空文字で呼び出し）
 
     // 2. 製品検索ロジック
     const fetchProducts = useCallback(async (keyword: string, manufacturer: string) => {
@@ -121,6 +115,9 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
         onClose();
     };
 
+    // 💡 修正: ここで初めて早期リターンを行う（フックがすべて実行された後）
+    if (!isOpen) return null;
+
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex justify-center items-center animate-fade-in">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 p-6 flex flex-col max-h-[90vh]">
@@ -172,7 +169,6 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
                     ) : products.length === 0 ? (
                         <div className="flex flex-col justify-center items-center h-full text-gray-500">
                             <p className="mb-3">条件に一致する商品は見つかりませんでした。</p>
-                            {/* 💡 0件時の誘導リンク */}
                             <a 
                                 href="/request-product" 
                                 target="_blank" 
@@ -242,7 +238,6 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
                         決定
                     </button>
 
-                    {/* 💡 フッター下部の誘導リンク */}
                     <div className="mt-3 text-center">
                         <p className="text-xs text-gray-400">
                             探している商品が見つからない場合は 

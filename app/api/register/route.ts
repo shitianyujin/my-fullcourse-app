@@ -1,54 +1,41 @@
+// app/api/register/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import bcrypt from 'bcrypt';
+import * as bcrypt from 'bcrypt';
 
-// ユーザー登録処理 (POST /api/register)
 export async function POST(request: Request) {
   try {
-    const { name, email, password } = await request.json();
+    const body = await request.json();
+    const { name, email, password } = body;
 
-    // 1. パラメータのバリデーション
     if (!name || !email || !password) {
-      return NextResponse.json(
-        { message: 'すべてのフィールドを入力してください。' },
-        { status: 400 }
-      );
+      return NextResponse.json({ message: '必須項目が不足しています' }, { status: 400 });
     }
-    
-    // 2. 既存ユーザーのチェック
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+
+    // 重複チェック
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
     if (existingUser) {
-      return NextResponse.json(
-        { message: 'このメールアドレスは既に登録されています。' },
-        { status: 409 } // Conflict
-      );
+      return NextResponse.json({ message: 'このメールアドレスは既に登録されています' }, { status: 409 });
     }
-    
-    // 3. パスワードのハッシュ化
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // 4. ユーザーをデータベースに作成
-    const newUser = await prisma.user.create({
+
+    // パスワードハッシュ化
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // ユーザー作成
+    await prisma.user.create({
       data: {
         name,
         email,
-        hashedPassword, // ハッシュ化されたパスワードを保存
+        hashedPassword,
       },
     });
 
-    // 成功レスポンスを返す（パスワードは含めない）
-    return NextResponse.json({ 
-      id: newUser.id,
-      name: newUser.name,
-      email: newUser.email,
-      message: 'ユーザー登録が完了しました。'
-    }, { status: 201 }); // Created
-
+    return NextResponse.json({ message: '登録完了' });
   } catch (error) {
-    console.error('Registration Error:', error);
-    return NextResponse.json(
-      { message: 'サーバー内部エラーが発生しました。' },
-      { status: 500 }
-    );
+    console.error('Registration error:', error);
+    return NextResponse.json({ message: 'エラーが発生しました' }, { status: 500 });
   }
 }

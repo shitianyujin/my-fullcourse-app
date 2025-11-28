@@ -2,7 +2,7 @@
 import { type NextAuthOptions } from "next-auth";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
-import EmailProvider from "next-auth/providers/email";
+// import EmailProvider from "next-auth/providers/email"; // 💡 コメントアウト
 import { prisma } from "@/lib/prisma";
 import * as bcrypt from "bcrypt";
 import { User as AuthUser } from "next-auth";
@@ -13,7 +13,8 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   providers: [
-    // 1. Magic Link (Email) Provider
+    // 💡 将来復活させるためにコメントアウトで残す
+    /*
     EmailProvider({
       server: {
         host: process.env.EMAIL_SERVER_HOST,
@@ -25,8 +26,9 @@ export const authOptions: NextAuthOptions = {
       },
       from: process.env.EMAIL_FROM,
     }),
+    */
 
-    // 2. Password Provider
+    // Password Provider (メイン)
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -40,6 +42,7 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
         });
 
+        // ユーザーがいない、またはパスワード未設定の場合
         if (!user || !user.hashedPassword) {
             return null;
         }
@@ -60,27 +63,21 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    // 💡 triggerとsession引数を追加して更新を検知できるようにする
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.isAdmin = (user as any).isAdmin;
       }
-
-      // 💡 プロフィール更新(update)が呼ばれたら、トークンの情報を書き換える
       if (trigger === "update" && session) {
         token.name = session.name;
-        token.picture = session.image; // NextAuthでは画像は picture プロパティに入ります
+        token.picture = session.image;
       }
-
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.isAdmin = token.isAdmin as boolean;
-        
-        // 💡 更新されたトークン情報をセッションに反映
         session.user.name = token.name;
         session.user.image = token.picture;
       }

@@ -1,28 +1,27 @@
 // app/page.tsx
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { FaArrowRight, FaCrown, FaSearch } from "react-icons/fa";
-// 💡 修正: キラキラアイコンを bs パッケージからインポート
+import { FaArrowRight, FaCrown } from "react-icons/fa";
 import { BsStars } from "react-icons/bs"; 
 import CourseCard from "@/components/CourseCard";
 
 // データ取得関数
 async function getHomeData() {
-  // 共通のinclude設定
   const commonInclude = {
     user: { select: { id: true, name: true, image: true } },
-    // 💡 追加: メインディッシュの画像を最大2枚取得
     courseItems: {
       where: { role: 'メインディッシュ' },
       take: 2,
       include: {
         product: { select: { imageUrl: true } }
       }
+    },
+    ratings: {
+      select: { score: true }
     }
   };
 
-  // 1. 人気ランキング TOP3
-  const rankingCourses = await prisma.course.findMany({
+  const rawRankingCourses = await prisma.course.findMany({
     orderBy: [
       { wantsToEatCount: 'desc' },
       { createdAt: 'desc' }
@@ -31,21 +30,38 @@ async function getHomeData() {
     include: commonInclude,
   });
 
-  // 2. 新着コース TOP6
-  const latestCourses = await prisma.course.findMany({
+  const rawLatestCourses = await prisma.course.findMany({
     orderBy: { createdAt: 'desc' },
     take: 6,
     include: commonInclude,
   });
 
-  return { rankingCourses, latestCourses };
+  const calcRating = (courses: any[]) => {
+    return courses.map(course => {
+      const ratings = course.ratings || [];
+      const totalScore = ratings.reduce((acc: number, curr: any) => acc + curr.score, 0);
+      const count = ratings.length;
+      const average = count > 0 ? totalScore / count : 0;
+      
+      return {
+        ...course,
+        averageRating: average,
+        totalRatingsCount: count,
+      };
+    });
+  };
+
+  return { 
+    rankingCourses: calcRating(rawRankingCourses), 
+    latestCourses: calcRating(rawLatestCourses) 
+  };
 }
 
 // データ整形用ヘルパー関数
 const formatForCard = (course: any) => ({
   ...course,
   averageRating: Number(course.averageRating) || 0,
-  totalRatingsCount: 0,
+  totalRatingsCount: course.totalRatingsCount || 0,
   createdAt: course.createdAt.toISOString(),
   user: {
     ...course.user,
@@ -61,7 +77,6 @@ export default async function Home() {
       
       {/* 1. ヒーローセクション */}
       <section className="bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 text-white py-20 px-4 sm:px-6 lg:px-8 text-center relative overflow-hidden">
-        {/* 装飾用の円（背景） */}
         <div className="absolute top-0 left-0 w-64 h-64 bg-white opacity-5 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl"></div>
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500 opacity-10 rounded-full translate-x-1/3 translate-y-1/3 blur-3xl"></div>
 
@@ -96,23 +111,20 @@ export default async function Home() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* 2. 人気ランキングセクション */}
+        {/* 2. 人気ランキングセクション (修正版) */}
         <section className="py-16 border-b border-gray-200">
-          <div className="flex justify-between items-end mb-8">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-                <FaCrown className="text-yellow-500 mr-2" />
-                人気のフルコース
-              </h2>
-              <p className="text-gray-500 text-sm mt-1">みんなが「食べたい！」と思った注目のコース</p>
-            </div>
-            <Link href="/ranking" className="text-indigo-600 font-bold text-sm hover:underline flex items-center">
-              ランキングを見る <FaArrowRight className="ml-1" />
-            </Link>
+          {/* 💡 ヘッダーを中央揃えに修正し、王冠を左右に配置 */}
+          <div className="text-center mb-10">
+            <h2 className="text-2xl font-bold text-gray-900 flex justify-center items-center gap-2">
+              <FaCrown className="text-yellow-500 text-3xl" />
+              人気のフルコース
+              <FaCrown className="text-yellow-500 text-3xl" />
+            </h2>
+            <p className="text-gray-500 text-sm mt-2">みんなが「食べたい！」と思った注目のコース</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {rankingCourses.map((course, index) => (
+            {rankingCourses.map((course: any, index: number) => (
               <div key={course.id} className="relative transform transition hover:-translate-y-1">
                 {/* 1位〜3位のバッジ */}
                 <div 
@@ -128,13 +140,22 @@ export default async function Home() {
               <p className="col-span-3 text-center text-gray-500 py-8">まだランキングデータがありません。</p>
             )}
           </div>
+
+          {/* 💡 ランキングリンクを下部へ移動 */}
+          <div className="text-center mt-10">
+            <Link 
+              href="/ranking" 
+              className="px-8 py-2.5 bg-white border border-gray-300 text-gray-600 font-medium rounded-full hover:bg-gray-50 hover:text-indigo-600 hover:border-indigo-300 transition shadow-sm inline-flex items-center"
+            >
+              ランキングを見る <FaArrowRight className="ml-2 text-xs" />
+            </Link>
+          </div>
         </section>
 
-        {/* 3. 新着コースセクション (デザイン強化) */}
+        {/* 3. 新着コースセクション */}
         <section className="py-16 my-8 bg-gray-50 rounded-3xl px-4 sm:px-8">
           <div className="text-center mb-10">
             <h2 className="text-2xl font-bold text-gray-900 flex justify-center items-center gap-2">
-              {/* 💡 修正: FaSparkles -> BsStars */}
               <BsStars className="text-yellow-400 text-3xl" />
               新着のフルコース
               <BsStars className="text-yellow-400 text-3xl" />
@@ -143,9 +164,8 @@ export default async function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {latestCourses.map((course) => (
+            {latestCourses.map((course: any) => (
               <div key={course.id} className="relative group">
-                {/* NEWバッジ */}
                 <div className="absolute -top-2 -right-2 z-10 bg-rose-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md border-2 border-white transform rotate-12 group-hover:rotate-0 transition-transform">
                   NEW
                 </div>

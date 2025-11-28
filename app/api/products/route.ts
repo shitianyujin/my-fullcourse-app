@@ -37,12 +37,14 @@ export async function GET(request: Request) {
       whereCondition.OR = [
         {
           name: {
-            contains: search
+            contains: search,
+            mode: 'insensitive', // 💡復活
           },
         },
         {
           description: {
-            contains: search
+            contains: search,
+            mode: 'insensitive', // 💡復活
           },
         },
       ];
@@ -65,8 +67,15 @@ export async function GET(request: Request) {
         name: true,
         description: true,
         priceReference: true,
+        priceUnitQty: true,
         imageUrl: true, 
-        manufacturer: true, // 💡 メーカー情報の取得を追加！
+        manufacturer: true,
+        amazonUrl: true,
+        amazonPrice: true,
+        rakutenUrl: true,
+        rakutenPrice: true,
+        yahooUrl: true,
+        yahooPrice: true,
       },
       take: limit,
       skip: skip,

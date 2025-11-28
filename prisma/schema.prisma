@@ -1,16 +1,13 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.lyly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ====================================================================
@@ -20,17 +17,16 @@ datasource db {
 // 1. ユーザー (users)
 model User {
   id                 Int                 @id @default(autoincrement())
-  name               String?             @db.VarChar(100)
-  email              String              @unique @db.VarChar(100) // 認証用のユニークメールアドレス
-  hashedPassword     String?             @db.VarChar(255) @map("hashed_password")// パスワードハッシュを格納するカラム(Auth.js関連)
-  image              String?             @db.VarChar(255)
-  bio                String?             @db.Text
+  name               String?             // PostgresではデフォルトでText型
+  email              String              @unique
+  hashedPassword     String?             @map("hashed_password")
+  image              String?
+  bio                String?
   isAdmin            Boolean             @default(false) @map("is_admin")
-  courseCount        Int                 @default(0) @map("course_count") // 投稿数カウンタ
+  courseCount        Int                 @default(0) @map("course_count")
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
   lastLoggedInAt     DateTime?           @map("last_logged_in_at")
-  // Auth.js連携用
   emailVerified      DateTime?           @map("email_verified")
 
   // リレーション
@@ -40,7 +36,6 @@ model User {
   triedRecords       Tried[]
   ratings            Rating[]
   contactSubmissions ContactSubmission[]
-  // Auth.js連携用
   accounts           Account[]
   sessions           Session[]
 
@@ -54,16 +49,22 @@ model User {
 // 2. 冷凍食品カタログ (products)
 model Product {
   id                 Int                 @id @default(autoincrement())
-  name               String              @db.VarChar(100)
-  manufacturer       String              @db.VarChar(50)
-  description        String?             @db.Text
-  janCode            String?             @unique @db.VarChar(13) @map("jan_code")
-  imageUrl           String?             @db.VarChar(255) @map("image_url")
-  officialUrl        String?             @db.VarChar(255) @map("official_url")
-  priceReference     String?             @db.VarChar(20) @map("price_reference")
-  priceUnitQty       String?             @db.VarChar(50) @map("price_unit_qty")
+  name               String
+  manufacturer       String
+  description        String?
+  janCode            String?             @unique @map("jan_code")
+  imageUrl           String?             @map("image_url")
+  officialUrl        String?             @map("official_url")
+  priceReference     Int?                @map("price_reference") 
+  priceUnitQty       String?             @map("price_unit_qty")
   isOnSale           Boolean             @default(true) @map("is_on_sale")
-  amazonAsin         String?             @db.VarChar(10) @map("amazon_asin") // マネタイズ機能の準備
+  amazonAsin         String?             @map("amazon_asin")
+  amazonUrl          String?             @map("amazon_url")
+  amazonPrice        Int?                @map("amazon_price")
+  rakutenUrl         String?             @map("rakuten_url")
+  rakutenPrice       Int?                @map("rakuten_price")
+  yahooUrl           String?             @map("yahoo_url")
+  yahooPrice         Int?                @map("yahoo_price")
   lastCheckedAt      DateTime?           @map("last_checked_at")
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
@@ -78,8 +79,8 @@ model Product {
 // 3. カテゴリマスター (categories)
 model Category {
   id                  Int                 @id @default(autoincrement())
-  name                String              @unique @db.VarChar(50)
-  description         String?             @db.Text
+  name                String              @unique
+  description         String?
   createdAt           DateTime            @default(now()) @map("created_at")
   updatedAt           DateTime            @updatedAt @map("updated_at")
 
@@ -89,7 +90,7 @@ model Category {
   @@map("categories")
 }
 
-// 4. 商品カテゴリ中間 (product_categories) - 多対多の中間テーブル
+// 4. 商品カテゴリ中間 (product_categories)
 model ProductCategory {
   productId           Int                 @map("product_id")
   categoryId          Int                 @map("category_id")
@@ -98,7 +99,7 @@ model ProductCategory {
   product             Product             @relation(fields: [productId], references: [id])
   category            Category            @relation(fields: [categoryId], references: [id])
 
-  @@id([productId, categoryId]) // 複合主キー
+  @@id([productId, categoryId])
   @@map("product_categories")
 }
 
@@ -109,13 +110,13 @@ model ProductCategory {
 // 5. フルコース投稿 (courses)
 model Course {
   id                  Int                 @id @default(autoincrement())
-  title               String              @db.VarChar(100)
-  description         String?             @db.Text
+  title               String
+  description         String?
   userId              Int                 @map("user_id")
-  wantsToEatCount     Int                 @default(0) @map("wants_to_eat_count") // 食べたい数
-  triedCount          Int                 @default(0) @map("tried_count")        // 食べたよ数
-  averageRating       Decimal?            @db.Decimal(3, 2) @map("average_rating") // 平均評価点 (例: 4.50)
-  commentCount        Int                 @default(0) @map("comment_count") // コメント数
+  wantsToEatCount     Int                 @default(0) @map("wants_to_eat_count")
+  triedCount          Int                 @default(0) @map("tried_count")
+  averageRating       Decimal?            @db.Decimal(3, 2) @map("average_rating")
+  commentCount        Int                 @default(0) @map("comment_count")
   createdAt           DateTime            @default(now()) @map("created_at")
   updatedAt           DateTime            @updatedAt @map("updated_at")
 
@@ -135,11 +136,11 @@ model CourseItem {
   id                  Int                 @id @default(autoincrement())
   courseId            Int                 @map("course_id")
   productId           Int                 @map("product_id")
-  order               Int                 // フルコース内での順番 (1:アミューズ, 6:デセールなど)
-  role                String?             @db.VarChar(50)
+  order               Int
+  role                String?
 
   // リレーション
-  course              Course              @relation(fields: [courseId], references: [id], onDelete: Cascade) // コース削除時、構成要素も削除
+  course              Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
   product             Product             @relation(fields: [productId], references: [id])
 
   @@map("course_items")
@@ -149,12 +150,12 @@ model CourseItem {
 // IV. コミュニティ
 // ====================================================================
 
-// 7. 評価 (ratings) - ユーザーごとの点数
+// 7. 評価 (ratings)
 model Rating {
   id                  Int                 @id @default(autoincrement())
   courseId            Int                 @map("course_id")
   userId              Int                 @map("user_id")
-  score               Int                 @db.TinyInt
+  score               Int                 // @db.TinyInt削除 -> Int
   createdAt           DateTime            @default(now()) @map("created_at")
   updatedAt           DateTime            @updatedAt @map("updated_at")
 
@@ -162,7 +163,7 @@ model Rating {
   course              Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
   user                User                @relation(fields: [userId], references: [id])
 
-  @@unique([courseId, userId]) // 1ユーザーが1コースに複数回評価できないようにする
+  @@unique([courseId, userId])
   @@map("ratings")
 }
 
@@ -177,7 +178,7 @@ model WantsToEat {
   course              Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
   user                User                @relation(fields: [userId], references: [id])
 
-  @@unique([courseId, userId]) // 1ユーザーが1コースに複数回「食べたい」を付けられないようにする
+  @@unique([courseId, userId])
   @@map("wants_to_eat")
 }
 
@@ -186,7 +187,7 @@ model Comment {
   id                  Int                 @id @default(autoincrement())
   courseId            Int                 @map("course_id")
   userId              Int                 @map("user_id")
-  content             String              @db.Text
+  content             String
   createdAt           DateTime            @default(now()) @map("created_at")
   updatedAt           DateTime            @updatedAt @map("updated_at")
 
@@ -208,46 +209,40 @@ model Tried {
   course              Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
   user                User                @relation(fields: [userId], references: [id])
 
-  @@unique([courseId, userId]) // 1ユーザーが1コースに複数回「食べたよ」を付けられないようにする
+  @@unique([courseId, userId])
   @@map("trieds")
 }
 
 // 11. 問い合わせ（ContactSubmission）
-// 問い合わせの種別を定義するEnum
 enum SubmissionType {
-  REQUEST     // 要望
-  BUG_REPORT  // 不具合報告
-  ACCOUNT     // アカウント関連
-  PRODUCT_REQUEST // 商品追加依頼
-  OTHER       // その他
+  REQUEST
+  BUG_REPORT
+  ACCOUNT
+  PRODUCT_REQUEST
+  OTHER
 }
 
-// 問い合わせの状態を定義するEnum
 enum SubmissionStatus {
-  OPEN        // 受付中
-  IN_PROGRESS // 処理中
-  RESOLVED    // 解決済み
-  CLOSED      // クローズ
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
 }
 
 model ContactSubmission {
   id                  Int                 @id @default(autoincrement())
-  // 問い合わせ者情報 (ログインユーザーの場合)
-  userId              Int?                @map("user_id")// ログインユーザーID (任意)
+  userId              Int?                @map("user_id")
   user                User?               @relation(fields: [userId], references: [id])
-  // 問い合わせ者情報 (未ログインユーザーの場合)
-  submitterName       String?             @map("submitter_name") // 氏名 (未ログイン時のみ使用)
-  submitterEmail      String              @map("submitter_email") // 返信先メールアドレス (必須)
-  // 問い合わせ内容
+  submitterName       String?             @map("submitter_name")
+  submitterEmail      String              @map("submitter_email")
   type                SubmissionType
-  title               String              @db.VarChar(255)
-  details             String              @db.Text
-  // 運営管理用
-  status              SubmissionStatus    @default(OPEN) // 問い合わせの現在の状態  
+  title               String
+  details             String
+  status              SubmissionStatus    @default(OPEN)  
   createdAt           DateTime            @default(now()) @map("created_at")
   updatedAt           DateTime            @updatedAt @map("updated_at")
   
-  @@map("contact_submissions") // テーブル名も複数形スネークケースに統一
+  @@map("contact_submissions")
 }
 
 // ====================================================================
@@ -260,12 +255,12 @@ model Account {
   type                String
   provider            String
   providerAccountId   String  @map("provider_account_id")
-  refresh_token       String? @db.Text
-  access_token        String? @db.Text
+  refresh_token       String?
+  access_token        String?
   expires_at          Int?
   token_type          String?
   scope               String?
-  id_token            String? @db.Text
+  id_token            String?
   session_state       String? @map("session_state")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -292,4 +287,16 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+// パスワードリセット用トークン
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([email, token])
+  @@map("password_reset_tokens")
 }

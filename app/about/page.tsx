@@ -16,7 +16,7 @@ export default function AboutPage() {
             組み合わせることで「フルコース」になる。
           </h1>
           <p className="text-indigo-100 text-lg">
-            MyFullCourseAppへようこそ
+            『おれふる』へようこそ
           </p>
         </div>
 
@@ -83,7 +83,7 @@ export default function AboutPage() {
               <div className="bg-yellow-100 p-3 rounded-full mr-4">
                 <FaLightbulb className="text-yellow-600 text-2xl" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-800">MyFullCourseAppでできること</h2>
+              <h2 className="text-2xl font-bold text-gray-800">『おれふる』でできること</h2>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">

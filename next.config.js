@@ -1,6 +1,33 @@
 const nextConfig = {
-    // 以前の設定が空の場合はこのままでOK
-    // もし以前に設定していた内容があればここに追加してください
+  images: {
+    remotePatterns: [
+      // 楽天の画像ドメイン許可
+      {
+        protocol: 'https',
+        hostname: 'thumbnail.image.rakuten.co.jp',
+      },
+      // Yahoo!ショッピングの画像ドメイン許可
+      {
+        protocol: 'https',
+        hostname: 'item-shopping.c.yimg.jp',
+      },
+      // Amazonの画像ドメイン許可
+      {
+        protocol: 'https',
+        hostname: 'm.media-amazon.com',
+      },
+      // Unsplash (テスト用)
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      // DiceBear (アバター用)
+      {
+        protocol: 'https',
+        hostname: 'api.dicebear.com',
+      },
+    ],
+  },
 };
 
 module.exports = nextConfig;

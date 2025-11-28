@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { FaCrown, FaTrophy } from "react-icons/fa";
 import CourseCard from "@/components/CourseCard";
+// 💡 追加: 作成したクライアントコンポーネントをインポート
+import { RankingProductList } from "@/components/RankingProductList";
 
 // サーバーコンポーネントでデータ取得
 async function getRankings() {
@@ -10,11 +12,12 @@ async function getRankings() {
   const courseRanking = await prisma.course.findMany({
     orderBy: [
       { wantsToEatCount: 'desc' },
-      { createdAt: 'desc' } // 💡修正1: created_at ではなく createdAt
+      { createdAt: 'desc' }
     ],
     take: 10,
     include: {
       user: { select: { id: true, name: true, image: true } },
+      // 💡 画像表示用にメインディッシュ情報を含める
       courseItems: {
         where: { role: 'メインディッシュ' },
         take: 2,
@@ -46,9 +49,9 @@ async function getRankings() {
   });
 
   // 集計データと商品情報を結合
+  // ここで型を整形して RankingProductList に渡せるようにする
   const productRanking = productStats.map(stat => {
     const product = products.find(p => p.id === stat.productId);
-    // productが見つからない場合のガード
     if (!product) return null;
     return {
       ...product,
@@ -59,7 +62,7 @@ async function getRankings() {
   return { courseRanking, productRanking };
 }
 
-// 順位に応じた王冠アイコン
+// 順位に応じた王冠アイコン (コース一覧側で使用)
 const RankBadge = ({ rank }: { rank: number }) => {
   if (rank === 1) return <FaCrown className="text-yellow-400 text-2xl" />;
   if (rank === 2) return <FaCrown className="text-gray-400 text-2xl" />;
@@ -82,8 +85,8 @@ export default async function RankingPage({
           <FaTrophy className="text-yellow-500 mr-3" />
           ランキング
         </h1>
-        <p className="text-gray-500">
-          みんなが選んだ『最強の組み合わせ』と、こだわりの逸品。
+        <p className="text-gray-500 mt-2">
+          みんなが選んだ「最強の組み合わせ」と、こだわりの逸品。
         </p>
       </div>
 
@@ -117,13 +120,13 @@ export default async function RankingPage({
 
       {/* コンテンツエリア */}
       {activeTab === 'course' ? (
+        // --- コースランキング表示 ---
         <div className="space-y-8">
           {courseRanking.length === 0 ? (
              <p className="text-center text-gray-500 py-10">集計データがありません。</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {courseRanking.map((course, index) => {
-                // 💡修正2: CourseCardに渡すために型を調整
                 const formattedCourse = {
                   ...course,
                   averageRating: Number(course.averageRating) || 0,
@@ -150,47 +153,10 @@ export default async function RankingPage({
           )}
         </div>
       ) : (
+        // --- 商品ランキング表示 ---
         <div className="max-w-4xl mx-auto">
-          {productRanking.length === 0 ? (
-            <p className="text-center text-gray-500 py-10">集計データがありません。</p>
-          ) : (
-             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                {productRanking.map((product, index) => (
-                  <div 
-                    key={product.id} 
-                    className="flex items-center p-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition"
-                  >
-                    <div className="w-12 flex-shrink-0 flex justify-center">
-                       <RankBadge rank={index + 1} />
-                    </div>
-                    
-                    <div className="flex-shrink-0 h-16 w-16 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 mx-4">
-                        {product.imageUrl ? (
-                            <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
-                        ) : (
-                            <div className="h-full w-full flex items-center justify-center text-gray-400 text-xs">No Img</div>
-                        )}
-                    </div>
-
-                    <div className="flex-grow min-w-0 mr-4">
-                        <h3 className="text-lg font-bold text-gray-800 truncate">
-                            {product.name}
-                        </h3>
-                        <p className="text-sm text-indigo-600 font-medium truncate">
-                            {product.manufacturer}
-                        </p>
-                    </div>
-
-                    <div className="flex-shrink-0 text-right">
-                        <div className="text-2xl font-bold text-gray-900">
-                            {product.count}
-                        </div>
-                        <div className="text-xs text-gray-500">採用回数</div>
-                    </div>
-                  </div>
-                ))}
-             </div>
-          )}
+          {/* 💡 修正: ここをコンポーネント呼び出しに置き換え */}
+          <RankingProductList products={productRanking} />
         </div>
       )}
     </div>

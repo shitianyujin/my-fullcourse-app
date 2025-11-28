@@ -5,8 +5,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation'; 
-// 💡 FaCog (歯車アイコン) を追加
 import { FaUserCircle, FaSignOutAlt, FaPlusCircle, FaUser, FaChevronDown, FaCog } from 'react-icons/fa';
+import { Logo } from '@/components/Logo';
 
 export const Navbar: React.FC = () => {
   const { data: session, status } = useSession();
@@ -17,7 +17,6 @@ export const Navbar: React.FC = () => {
 
   const isLoading = status === 'loading';
 
-  // ユーザーIDを取得 (変更なし)
   useEffect(() => {
     const fetchUserId = async () => {
       if (session?.user?.email) {
@@ -35,7 +34,6 @@ export const Navbar: React.FC = () => {
     fetchUserId();
   }, [session]);
 
-  // ドロップダウン外クリックで閉じる (変更なし)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -51,7 +49,6 @@ export const Navbar: React.FC = () => {
     };
   }, [isDropdownOpen]);
 
-  // ログアウト処理 (変更なし)
   const handleSignOut = async () => {
     setIsDropdownOpen(false);
     await signOut({ callbackUrl: '/' });
@@ -62,15 +59,12 @@ export const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           
-          {/* 1. ロゴ/タイトル */}
           <Link href="/" className="flex-shrink-0 text-xl font-bold text-gray-900 hover:text-indigo-600 transition">
-            MyFullCourseApp
+            <Logo variant="header" />
           </Link>
 
-          {/* 2. 右側の認証ステータスとボタン */}
           <div className="flex items-center space-x-4">
             
-            {/* ログインしている場合のみ「投稿」ボタンを表示 */}
             {session && (
               <Link 
                 href="/create" 
@@ -82,10 +76,8 @@ export const Navbar: React.FC = () => {
             )}
 
             {isLoading ? (
-              // ロード中
               <div className="h-5 w-20 bg-gray-200 animate-pulse rounded"></div>
             ) : session ? (
-              // --- ログイン済みの場合 ---
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -104,11 +96,9 @@ export const Navbar: React.FC = () => {
                   <FaChevronDown className={`w-3 h-3 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* ドロップダウンメニュー */}
                 {isDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                     
-                    {/* 💡 管理者メニュー (isAdminがtrueの場合のみ表示) */}
                     {(session.user as any).isAdmin && (
                         <Link
                             href="/admin"
@@ -149,8 +139,9 @@ export const Navbar: React.FC = () => {
                 >
                   ログイン
                 </Link>
+                {/* 💡 修正: ?view=register を ?mode=register に変更 */}
                 <Link 
-                  href={`/login?view=magiclink&callbackUrl=${encodeURIComponent(currentPath)}`}
+                  href={`/login?mode=register&callbackUrl=${encodeURIComponent(currentPath)}`}
                   className="px-3 py-1 text-sm font-medium text-indigo-600 border border-indigo-600 rounded-md hover:bg-indigo-50 transition"
                 >
                   新規登録

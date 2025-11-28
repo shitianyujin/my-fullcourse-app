@@ -1,6 +1,7 @@
 // src/components/Footer.tsx
 import React from 'react';
 import Link from 'next/link';
+import { Logo } from '@/components/Logo';
 
 export const Footer: React.FC = () => {
   // 現在の年を取得
@@ -13,12 +14,12 @@ export const Footer: React.FC = () => {
           
           {/* 左側: ブランド情報 */}
           <div className="text-center md:text-left">
-            <h2 className="text-lg font-bold text-gray-900">MyFullCourseApp</h2>
+            <h2 className="text-lg font-bold text-gray-900"><Logo variant="header" /></h2>
             <p className="text-sm text-gray-500 mt-1">
-              あなただけの特別なフルコースを見つけよう
+              冷凍食品でつくる、最強の『俺のフルコース』。
             </p>
             <p className="text-xs text-gray-400 mt-4">
-              &copy; {currentYear} MyFullCourseApp. All rights reserved.
+              &copy; {currentYear} Oreful. All rights reserved.
             </p>
           </div>
 
@@ -39,7 +40,7 @@ export const Footer: React.FC = () => {
             <div className="flex flex-col space-y-2 text-center md:text-left">
               <h3 className="font-semibold text-gray-900">サポート</h3>
               <Link href="/about" className="text-gray-600 hover:text-blue-600 transition">
-                MyFullCourseAppについて
+                おれふるについて
               </Link>
               <Link href="/contact" className="text-gray-600 hover:text-blue-600 transition">
                 お問い合わせ

@@ -32,14 +32,13 @@ async function getCourses({
   // 1. キーワード検索 (タイトル OR 説明 OR 商品名)
   if (query) {
     where.OR = [
-      { title: { contains: query } },
-      { description: { contains: query } },
-      // 💡追加: コースに含まれる「商品名」も検索対象にする
+      { title: { contains: query, mode: 'insensitive' } },       // 💡復活
+      { description: { contains: query, mode: 'insensitive' } }, // 💡復活
       {
         courseItems: {
           some: {
             product: {
-              name: { contains: query }
+              name: { contains: query, mode: 'insensitive' }     // 💡復活
             }
           }
         }
