@@ -3,6 +3,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+
+export const dynamic = 'force-dynamic';
+
 // 1ページあたりのデフォルトの製品数
 const DEFAULT_LIMIT = 20; 
 
