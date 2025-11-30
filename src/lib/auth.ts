@@ -2,10 +2,13 @@
 import { type NextAuthOptions } from "next-auth";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
-// import EmailProvider from "next-auth/providers/email"; // 💡 コメントアウト
+import EmailProvider from "next-auth/providers/email";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { User as AuthUser } from "next-auth";
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -13,20 +16,43 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   providers: [
-    // 💡 将来復活させるためにコメントアウトで残す
-    /*
     EmailProvider({
-      server: {
-        host: process.env.EMAIL_SERVER_HOST,
-        port: Number(process.env.EMAIL_SERVER_PORT),
-        auth: {
-          user: process.env.EMAIL_SERVER_USER,
-          pass: process.env.EMAIL_SERVER_PASSWORD,
-        },
-      },
       from: process.env.EMAIL_FROM,
+      // ここでResendを使ってメールを送る処理を上書きします
+      sendVerificationRequest: async ({ identifier, url, provider }) => {
+        const { host } = new URL(url);
+        
+        try {
+          await resend.emails.send({
+            from: provider.from as string,
+            to: identifier,
+            subject: `【おれふる】ログイン用リンク`,
+            text: `おれふるにログインするには、以下のリンクをクリックしてください。\n\n${url}\n\n`,
+            // HTMLメールのデザイン（簡易版）
+            html: `
+              <body style="background: #f9f9f9; padding: 20px; font-family: sans-serif;">
+                <div style="max-width: 600px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 8px; text-align: center; border: 1px solid #eee;">
+                  <h1 style="color: #333; font-size: 24px; margin-bottom: 20px;">おれふるへようこそ</h1>
+                  <p style="color: #666; margin-bottom: 30px;">
+                    以下のボタンをクリックしてログインを完了してください。<br>
+                    冷凍食品のフルコースをシェアしましょう！
+                  </p>
+                  <a href="${url}" style="display: inline-block; background: #0070f3; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold;">
+                    ログインする
+                  </a>
+                  <p style="color: #999; font-size: 12px; margin-top: 40px;">
+                    もしこのメールに心当たりがない場合は、無視していただいて構いません。
+                  </p>
+                </div>
+              </body>
+            `,
+          });
+        } catch (error) {
+          console.error("Resend error:", error);
+          throw new Error("メールの送信に失敗しました。");
+        }
+      },
     }),
-    */
 
     // Password Provider (メイン)
     CredentialsProvider({

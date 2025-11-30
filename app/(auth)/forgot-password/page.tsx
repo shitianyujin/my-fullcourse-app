@@ -7,70 +7,71 @@ import Link from 'next/link';
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
-  const [devLink, setDevLink] = useState(''); // 開発用リンク表示
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('');
-    setDevLink('');
+    setIsLoading(true);
 
-    const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-    });
+    try {
+        const res = await fetch('/api/auth/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
 
-    const data = await res.json();
-    if (res.ok) {
-        setMessage('パスワードリセット用のリンクを発行しました。');
-        // 開発用: 画面にもリンクを出す
-        if (data.devLink) {
-            setDevLink(data.devLink);
+        if (res.ok) {
+            setMessage('パスワード再設定用のメールを送信しました。メールをご確認ください。');
+        } else {
+            setMessage('エラーが発生しました。時間をおいて再度お試しください。');
         }
-    } else {
-        setMessage('エラーが発生しました。');
+    } catch (error) {
+        setMessage('通信エラーが発生しました。');
+    } finally {
+        setIsLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 p-4">
       <div className="max-w-md w-full bg-white p-8 rounded-lg shadow">
-        <h2 className="text-2xl font-bold mb-6 text-center">パスワードリセット</h2>
+        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">パスワードリセット</h2>
         
         {!message ? (
             <form onSubmit={handleSubmit} className="space-y-4">
-            <p className="text-sm text-gray-600 mb-4">
-                登録しているメールアドレスを入力してください。<br/>
-                リセット用のリンクを発行します。
-            </p>
-            <div>
-                <label className="block text-sm font-medium text-gray-700">メールアドレス</label>
-                <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md p-2"
-                />
-            </div>
-            <button type="submit" className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700">
-                送信
-            </button>
+                <p className="text-sm text-gray-600 mb-4">
+                    登録しているメールアドレスを入力してください。<br/>
+                    再設定用のリンクをお送りします。
+                </p>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">メールアドレス</label>
+                    <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="your@email.com"
+                    />
+                </div>
+                <button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className={`w-full text-white py-2 rounded transition-colors
+                        ${isLoading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                >
+                    {isLoading ? '送信中...' : '送信'}
+                </button>
             </form>
         ) : (
             <div className="text-center">
-                <p className="text-green-600 font-bold mb-4">{message}</p>
-                
-                {/* 開発用リンク表示エリア */}
-                {devLink && (
-                    <div className="bg-yellow-50 p-4 rounded border border-yellow-200 mb-4 text-left">
-                        <p className="text-xs text-yellow-800 font-bold mb-1">【開発モード用】擬似メール:</p>
-                        <p className="text-xs text-gray-600 mb-2">本来はメールで届くリンクです。</p>
-                        <a href={devLink} className="text-blue-600 underline text-sm break-all">
-                            {devLink}
-                        </a>
-                    </div>
-                )}
+                <div className="mb-4 p-4 bg-green-50 text-green-700 rounded-md text-sm font-medium">
+                    {message}
+                </div>
+                <p className="text-sm text-gray-500 mb-4">
+                    メールが届かない場合は、迷惑メールフォルダもご確認ください。
+                </p>
             </div>
         )}
 

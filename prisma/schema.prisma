@@ -17,6 +17,7 @@ datasource db {
 // 1. ユーザー (users)
 model User {
   id                 Int                 @id @default(autoincrement())
+  userId             String              @unique @map("user_id")
   name               String?             // PostgresではデフォルトでText型
   email              String              @unique
   hashedPassword     String?             @map("hashed_password")
@@ -299,4 +300,15 @@ model PasswordResetToken {
 
   @@unique([email, token])
   @@map("password_reset_tokens")
+}
+
+// メール認証コード (email_verification_codes)
+model EmailVerificationCode {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique // 1つのメアドにつき最新の1コードのみ保持
+  code      String
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("email_verification_codes")
 }
